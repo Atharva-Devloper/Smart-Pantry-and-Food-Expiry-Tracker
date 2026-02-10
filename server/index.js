@@ -3,6 +3,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const { User, PantryItem } = require('./models');
 
 // Load environment variables
 dotenv.config();
@@ -32,8 +33,28 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
+});
+
+// Test routes for models (remove in production)
+app.get('/api/test/users', async (req, res) => {
+  try {
+    const users = await User.find().select('-password');
+    res.json({ count: users.length, users });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/test/items', async (req, res) => {
+  try {
+    const items = await PantryItem.find().populate('userId', 'name email');
+    res.json({ count: items.length, items });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // API routes will be added here
