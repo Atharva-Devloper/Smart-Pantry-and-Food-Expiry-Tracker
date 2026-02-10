@@ -62,6 +62,8 @@ app.get('/api/test/items', async (req, res) => {
 // app.use('/api/items', itemRoutes);
 // app.use('/api/categories', categoryRoutes);
 
+app.use('/products', require('./routes/productRoutes'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
