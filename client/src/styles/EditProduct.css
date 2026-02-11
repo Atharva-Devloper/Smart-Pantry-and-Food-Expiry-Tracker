@@ -203,12 +203,12 @@
     margin: 20px;
     width: calc(100% - 40px);
   }
-  
+
   .edit-buttons {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .edit-button {
     padding: 10px 15px;
     font-size: 14px;

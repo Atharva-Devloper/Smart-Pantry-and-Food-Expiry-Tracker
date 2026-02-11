@@ -3,19 +3,21 @@ import '../styles/EditProduct.css';
 
 const EditProduct = ({ product, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
-    name: product.name,
-    quantity: product.quantity,
-    expiryDate: product.expiryDate ? product.expiryDate.split('T')[0] : ''
+    name: product?.name || '',
+    quantity: product?.quantity || '',
+    expiryDate: product?.expiryDate
+      ? new Date(product.expiryDate).toISOString().split('T')[0]
+      : '',
   });
-  
+
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -25,17 +27,20 @@ const EditProduct = ({ product, onSave, onCancel }) => {
     setMessage('');
 
     try {
-      const response = await fetch(`http://localhost:5000/products/${product._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          quantity: parseInt(formData.quantity),
-          expiryDate: formData.expiryDate
-        })
-      });
+      const response = await fetch(
+        `http://localhost:5000/products/${product._id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            quantity: parseInt(formData.quantity),
+            expiryDate: formData.expiryDate,
+          }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -63,18 +68,22 @@ const EditProduct = ({ product, onSave, onCancel }) => {
   return (
     <div className="edit-modal">
       <div className="edit-form-container">
-        <button 
-          className="close-button" 
+        <button
+          className="close-button"
           onClick={handleCancel}
           disabled={isLoading}
         >
           ×
         </button>
-        
+
         <h2 className="edit-title">Edit Product</h2>
-        
+
         {message && (
-          <div className={'message ' + (message.includes('Error') ? 'error' : 'success')}>
+          <div
+            className={
+              'message ' + (message.includes('Error') ? 'error' : 'success')
+            }
+          >
             {message}
           </div>
         )}
@@ -140,7 +149,9 @@ const EditProduct = ({ product, onSave, onCancel }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className={'edit-button save-button ' + (isLoading ? 'loading' : '')}
+              className={
+                'edit-button save-button ' + (isLoading ? 'loading' : '')
+              }
             >
               {isLoading ? 'Saving...' : 'Save Changes'}
             </button>
