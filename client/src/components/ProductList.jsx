@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import EditProduct from './EditProduct';
-import '../styles/ProductList.css';
+import { useState } from 'react';
 import '../styles/DeleteProduct.css';
+import '../styles/ProductList.css';
+import EditProduct from './EditProduct';
 
 const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
   const [loading, setLoading] = useState(false);
@@ -12,15 +12,42 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
     setEditingProduct(product);
   };
 
+  const handleUpdate = async (updatedProduct) => {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/products/${updatedProduct._id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedProduct),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setEditingProduct(null); // close modal
+        fetchProducts(); // refresh list
+      } else {
+        const errorData = await response.json();
+        setError('Failed to update product: ' + errorData.message);
+      }
+    } catch (error) {
+      setError('Error updating product: ' + error.message);
+    }
+  };
+
   const handleDelete = async (productId) => {
     if (!window.confirm('Are you sure you want to delete this product?')) {
       return;
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/products/${productId}`, {
-        method: 'DELETE'
-      });
+      const response = await fetch(
+        `http://localhost:5000/products/${productId}`,
+        {
+          method: 'DELETE',
+        }
+      );
 
       if (response.ok) {
         if (onProductDeleted) {
@@ -52,13 +79,13 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
   const getExpiryStatus = (expiryDate) => {
     if (!expiryDate) return { class: 'unknown', text: 'Unknown' };
-    
+
     const today = new Date();
     const expiry = new Date(expiryDate);
     const diffTime = expiry - today;
@@ -94,7 +121,7 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
   return (
     <div className="product-list-container">
       <h2 className="list-title">Pantry Products</h2>
-      
+
       {products.length === 0 ? (
         <div className="empty-list">
           <div className="empty-icon">📦</div>
@@ -105,7 +132,7 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
         <div className="product-grid">
           {products.map((product) => {
             const expiryStatus = getExpiryStatus(product.expiryDate);
-            
+
             return (
               <div key={product._id} className="product-card">
                 <div className="product-header">
@@ -114,25 +141,27 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
                     {expiryStatus.text}
                   </span>
                 </div>
-                
+
                 <div className="product-details">
                   <div className="detail-item">
                     <span className="detail-label">Quantity:</span>
                     <span className="detail-value">{product.quantity}</span>
                   </div>
-                  
+
                   <div className="detail-item">
                     <span className="detail-label">Expiry:</span>
-                    <span className="detail-value">{formatDate(product.expiryDate)}</span>
+                    <span className="detail-value">
+                      {formatDate(product.expiryDate)}
+                    </span>
                   </div>
-                  
+
                   {product.category && (
                     <div className="detail-item">
                       <span className="detail-label">Category:</span>
                       <span className="detail-value">{product.category}</span>
                     </div>
                   )}
-                  
+
                   {product.location && (
                     <div className="detail-item">
                       <span className="detail-label">Location:</span>
@@ -140,15 +169,15 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="product-actions">
-                  <button 
+                  <button
                     onClick={() => handleEdit(product)}
                     className="edit-button"
                   >
                     ✏️ Edit
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDelete(product._id)}
                     className="delete-button"
                   >
