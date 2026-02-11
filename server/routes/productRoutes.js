@@ -20,4 +20,19 @@ router.post('/', async (req, res) => {
   }
 });
 
+// DELETE product by ID
+router.delete('/:id', async (req, res) => {
+  try {
+    const deletedProduct = await PantryItem.findByIdAndDelete(req.params.id);
+
+    if (!deletedProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json({ message: 'Product deleted successfully' });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 module.exports = router;
