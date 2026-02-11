@@ -44,23 +44,9 @@ app.get('/api/test/users', async (req, res) => {
     const users = await User.find().select('-password');
     res.json({ count: users.length, users });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
   }
 });
-
-app.get('/api/test/items', async (req, res) => {
-  try {
-    const items = await PantryItem.find().populate('userId', 'name email');
-    res.json({ count: items.length, items });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// API routes will be added here
-// app.use('/api/auth', authRoutes);
-// app.use('/api/items', itemRoutes);
-// app.use('/api/categories', categoryRoutes);
 
 app.use('/products', require('./routes/productRoutes'));
 

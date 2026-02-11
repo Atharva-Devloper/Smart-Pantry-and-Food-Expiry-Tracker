@@ -54,8 +54,16 @@ const pantryItemSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true, // Adds createdAt and updatedAt automatically
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  toJSON: { 
+    virtuals: true,
+    transform: function(doc, ret) {
+      delete ret.password; // Remove password from JSON output
+      return ret;
+    }
+  },
+  toObject: { 
+    virtuals: true 
+  }
 });
 
 // Virtual for days until expiry
