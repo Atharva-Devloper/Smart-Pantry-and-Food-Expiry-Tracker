@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AddProductForm from './AddProductForm';
 import ProductList from './ProductList';
@@ -30,7 +30,7 @@ const ProductsPage = () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:5000/products');
-      
+
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
@@ -81,9 +81,7 @@ const ProductsPage = () => {
 
       <main className="products-main">
         <div className="controls">
-          <div className="product-count">
-            Total Products: {products.length}
-          </div>
+          <div className="product-count">Total Products: {products.length}</div>
         </div>
 
         <div className="add-form-section">
@@ -94,7 +92,7 @@ const ProductsPage = () => {
           {loading ? (
             <div className="loading">Loading products...</div>
           ) : (
-            <ProductList 
+            <ProductList
               products={products}
               onProductUpdated={handleProductUpdated}
               onProductDeleted={handleProductDeleted}
