@@ -19,9 +19,16 @@ const pantryItemSchema = new mongoose.Schema(
       required: [true, 'Expiry date is required'],
       validate: {
         validator: function (value) {
-          return value > new Date(); // Expiry date must be in the future
+          // If it's a new document, check if it's in the future
+          // If it's an update, we might allow past dates if they were already there
+          if (this.isNew) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return value >= today;
+          }
+          return true;
         },
-        message: 'Expiry date must be in the future',
+        message: 'Expiry date cannot be in the past for new items',
       },
     },
     category: {

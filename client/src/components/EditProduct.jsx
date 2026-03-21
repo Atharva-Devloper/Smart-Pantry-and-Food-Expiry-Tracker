@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import '../styles/EditProduct.css';
 
+import API_BASE_URL from '../config';
+
 const EditProduct = ({ product, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     name: product?.name || '',
@@ -28,7 +30,7 @@ const EditProduct = ({ product, onSave, onCancel }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/products/${product._id}`,
+        `${API_BASE_URL}/products/${product._id}`,
         {
           method: 'PUT',
           headers: {

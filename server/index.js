@@ -9,7 +9,12 @@ const { User, PantryItem } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-console.log('Gemini key loaded:', !!process.env.GEMINI_API_KEY);
+const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smart_pantry';
+
+console.log('Environment initialized:');
+console.log('- Port:', PORT);
+console.log('- MongoDB URI configured:', !!MONGODB_URI);
+console.log('- Gemini key loaded:', !!process.env.GEMINI_API_KEY);
 
 // Middleware
 app.use(
@@ -22,10 +27,31 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Database connection
-mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/smart-pantry')
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+const connectDB = async () => {
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    console.log('Successfully connected to MongoDB');
+  } catch (err) {
+    console.error('MongoDB connection error:', err.message);
+    console.log('Retrying connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
+  }
+};
+
+connectDB();
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB runtime error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected. Attempting to reconnect...');
+  connectDB();
+});
 
 // Basic routes
 app.get('/', (req, res) => {
@@ -53,6 +79,10 @@ app.get('/api/test/users', async (req, res) => {
 });
 
 app.use('/products', require('./routes/productRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/shopping', require('./routes/shoppingRoutes'));
+app.use('/api/waste', require('./routes/wasteRoutes'));
+app.use('/api/recipes', require('./routes/recipeRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -65,7 +95,24 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+const startServer = (port) => {
+  const numericPort = Number(port);
+  if (numericPort >= 65536) {
+    console.error('No available ports found below 65536');
+    process.exit(1);
+  }
+  
+  const server = app.listen(numericPort, () => {
+    console.log(`Server is running on port ${numericPort}`);
+    console.log(`Health check: http://localhost:${numericPort}/api/health`);
+  }).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`Port ${numericPort} is busy, trying ${numericPort + 1}...`);
+      startServer(numericPort + 1);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+};
+
+startServer(PORT);

@@ -20,7 +20,23 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters long'],
-    select: false // Don't include password in queries by default
+    select: false
+  },
+  preferences: {
+    dietaryRestrictions: [{
+      type: String,
+      enum: ['vegan', 'vegetarian', 'gluten-free', 'dairy-free', 'nut-free', 'none'],
+      default: 'none'
+    }],
+    notificationSettings: {
+      expiryWarnings: { type: Boolean, default: true },
+      lowStockAlerts: { type: Boolean, default: true }
+    },
+    defaultStorageLocation: {
+      type: String,
+      enum: ['fridge', 'freezer', 'pantry', 'cupboard'],
+      default: 'pantry'
+    }
   }
 }, {
   timestamps: true, // Adds createdAt and updatedAt automatically
@@ -34,11 +50,12 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) {
+    return next();
+  }
   
   try {
-    // Use the newer bcryptjs API (v2.4.3+)
-    const salt = await bcrypt.genSalt(12);
+    const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error) {
@@ -50,8 +67,5 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
-
-// Index for better query performance
-userSchema.index({ email: 1 });
 
 module.exports = mongoose.model('User', userSchema);
