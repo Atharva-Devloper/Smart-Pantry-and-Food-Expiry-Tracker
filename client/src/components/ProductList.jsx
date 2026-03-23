@@ -2,6 +2,7 @@ import { useState } from 'react';
 import '../styles/DeleteProduct.css';
 import '../styles/ProductList.css';
 import EditProduct from './EditProduct';
+import API_BASE_URL from '../config';
 
 const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
   const [loading, setLoading] = useState(false);
@@ -15,7 +16,7 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
   const handleUpdate = async (updatedProduct) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/products/${updatedProduct._id}`,
+        `${API_BASE_URL}/products/${updatedProduct._id}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -26,7 +27,9 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
       if (response.ok) {
         const data = await response.json();
         setEditingProduct(null); // close modal
-        fetchProducts(); // refresh list
+        if (onProductUpdated) {
+          onProductUpdated(data);
+        }
       } else {
         const errorData = await response.json();
         setError('Failed to update product: ' + errorData.message);
@@ -43,7 +46,7 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/products/${productId}`,
+        `${API_BASE_URL}/products/${productId}`,
         {
           method: 'DELETE',
         }

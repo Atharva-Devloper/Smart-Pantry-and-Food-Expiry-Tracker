@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import '../styles/AddProductForm.css';
+import API_BASE_URL from '../config';
 
 const AddProductForm = ({ onProductAdded }) => {
   const [formData, setFormData] = useState({
@@ -28,7 +29,7 @@ const AddProductForm = ({ onProductAdded }) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/products', {
+      const response = await fetch(`${API_BASE_URL}/products`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

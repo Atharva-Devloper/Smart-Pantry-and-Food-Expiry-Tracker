@@ -4,6 +4,8 @@ import AddProductForm from './AddProductForm';
 import ProductList from './ProductList';
 import './ProductsPage.css';
 
+import API_BASE_URL from '../config';
+
 const ProductsPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,7 @@ const ProductsPage = () => {
   useEffect(() => {
     const testConnection = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/health');
+        const response = await fetch(`${API_BASE_URL}/api/health`);
         const data = await response.json();
         console.log('Backend connected:', data);
       } catch (error) {
@@ -29,7 +31,7 @@ const ProductsPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/products');
+      const response = await fetch(`${API_BASE_URL}/products`);
 
       if (response.ok) {
         const data = await response.json();

@@ -44,8 +44,59 @@ const normalizeLocation = (loc) => {
 
 router.get('/', async (req, res) => {
   try {
-    const products = await PantryItem.find();
+    const { search, category, location, status, sort } = req.query;
+    let query = {};
+
+    // Search by name
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    // Filter by category
+    if (category && category !== 'all') {
+      query.category = category;
+    }
+
+    // Filter by location
+    if (location && location !== 'all') {
+      query.location = location;
+    }
+
+    // Filter by status (fresh, expiring, expired)
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    let sortQuery = { expiryDate: 1 }; // Default sort by expiry date
+    if (sort === 'name') sortQuery = { name: 1 };
+    if (sort === 'quantity') sortQuery = { quantity: -1 };
+    if (sort === 'newest') sortQuery = { createdAt: -1 };
+
+    const products = await PantryItem.find(query).sort(sortQuery);
     res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ---------- GET EXPIRY SUMMARY ----------
+
+router.get('/summary', async (req, res) => {
+  try {
+    const totalItems = await PantryItem.countDocuments();
+    const expiredItems = await PantryItem.countDocuments({ status: 'expired' });
+    const expiringSoon = await PantryItem.countDocuments({ status: 'expiring' });
+    
+    const categoryDistribution = await PantryItem.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+
+    res.json({
+      totalItems,
+      expiredItems,
+      expiringSoon,
+      categoryDistribution
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -82,7 +133,36 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ---------- DELETE PRODUCT ----------
+// ---------- BATCH OPERATIONS ----------
+
+router.delete('/batch', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'Invalid or empty IDs array' });
+    }
+    const result = await PantryItem.deleteMany({ _id: { $in: ids } });
+    res.json({ message: `${result.deletedCount} items deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/batch/status', async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'Invalid or empty IDs array' });
+    }
+    const result = await PantryItem.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status } }
+    );
+    res.json({ message: `${result.modifiedCount} items updated successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 router.delete('/:id', async (req, res) => {
   try {
