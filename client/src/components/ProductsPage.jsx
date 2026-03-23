@@ -5,8 +5,10 @@ import ProductList from './ProductList';
 import './ProductsPage.css';
 
 import API_BASE_URL from '../config';
+import { useAuth } from '../context/AuthContext';
 
 const ProductsPage = () => {
+  const { token } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,16 +33,30 @@ const ProductsPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/products`);
+      if (!token) {
+        setError('Please log in first');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/products`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log('📥 Fetch products response:', response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`✅ Fetched ${data.length} products for logged-in user`);
         setProducts(data);
         setError('');
       } else {
+        console.error('Failed to fetch products:', response.status);
         setError('Failed to fetch products');
       }
     } catch (error) {
+      console.error('🔴 Fetch error:', error);
       setError('Error: ' + error.message);
     } finally {
       setLoading(false);
@@ -48,8 +64,10 @@ const ProductsPage = () => {
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (token) {
+      fetchProducts();
+    }
+  }, [token]);
 
   const handleProductAdded = () => {
     fetchProducts(); // Refresh product list after adding

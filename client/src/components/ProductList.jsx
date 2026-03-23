@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import API_BASE_URL from '../config';
+import { useAuth } from '../context/AuthContext';
 import '../styles/DeleteProduct.css';
 import '../styles/ProductList.css';
 import EditProduct from './EditProduct';
-import API_BASE_URL from '../config';
 
 const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
+  const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
@@ -15,27 +17,37 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
 
   const handleUpdate = async (updatedProduct) => {
     try {
+      console.log('📝 Updating product:', updatedProduct._id);
+
       const response = await fetch(
         `${API_BASE_URL}/products/${updatedProduct._id}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: 'include',
           body: JSON.stringify(updatedProduct),
         }
       );
 
+      console.log('📥 Update response:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        setEditingProduct(null); // close modal
+        console.log('✅ Product updated successfully');
+        setEditingProduct(null);
         if (onProductUpdated) {
           onProductUpdated(data);
         }
       } else {
         const errorData = await response.json();
-        setError('Failed to update product: ' + errorData.message);
+        setError('❌ Failed to update product: ' + errorData.message);
       }
     } catch (error) {
-      setError('Error updating product: ' + error.message);
+      console.error('🔴 Update error:', error);
+      setError('❌ Error updating product: ' + error.message);
     }
   };
 
@@ -45,23 +57,33 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/products/${productId}`,
-        {
-          method: 'DELETE',
-        }
-      );
+      console.log('🗑️  Deleting product:', productId);
+      setLoading(true);
+
+      const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+
+      console.log('📥 Delete response:', response.status);
 
       if (response.ok) {
+        console.log('✅ Product deleted successfully');
         if (onProductDeleted) {
           onProductDeleted();
         }
       } else {
         const errorData = await response.json();
-        setError('Failed to delete product: ' + errorData.message);
+        setError('❌ Failed to delete product: ' + errorData.message);
       }
     } catch (error) {
-      setError('Error deleting product: ' + error.message);
+      console.error('🔴 Delete error:', error);
+      setError('❌ Error deleting product: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
