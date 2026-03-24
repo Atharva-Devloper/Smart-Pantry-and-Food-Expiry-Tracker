@@ -16,6 +16,7 @@ const AddProductForm = ({ onProductAdded }) => {
 
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [useAIFill, setUseAIFill] = useState(true);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,6 +40,7 @@ const AddProductForm = ({ onProductAdded }) => {
       const payload = {
         ...formData,
         quantity: parseInt(formData.quantity),
+        useAIFill: useAIFill,
       };
 
       console.log('📤 Sending product to backend:', payload);
@@ -186,6 +188,18 @@ const AddProductForm = ({ onProductAdded }) => {
             rows="3"
             placeholder="e.g., Buy on sale, check for freshness, use for recipe..."
           />
+        </div>
+
+        <div className="form-group checkbox-group">
+          <label htmlFor="useAIFill">
+            <input
+              type="checkbox"
+              id="useAIFill"
+              checked={useAIFill}
+              onChange={(e) => setUseAIFill(e.target.checked)}
+            />
+            🤖 Use AI to auto-fill category, location & storage advice
+          </label>
         </div>
 
         <button type="submit" className="submit-btn">

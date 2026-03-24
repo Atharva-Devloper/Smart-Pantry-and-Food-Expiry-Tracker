@@ -115,6 +115,7 @@ router.post('/', authMiddleware, async (req, res) => {
       name: req.body.name,
       quantity: req.body.quantity,
       expiryDate: req.body.expiryDate,
+      useAIFill: req.body.useAIFill,
       userId: req.userId,
     });
 
@@ -127,18 +128,30 @@ router.post('/', authMiddleware, async (req, res) => {
 
     let aiData;
     const foodName = String(req.body.name).trim();
+    const useAIFill = req.body.useAIFill !== false; // Default to true if not specified
 
-    try {
-      console.log(`🤖 Calling Gemini AI for food: "${foodName}"`);
-      aiData = await analyzeFood(foodName);
-      console.log('✅ Gemini AI result:', aiData);
-    } catch (aiErr) {
-      console.error('⚠️  Gemini failed, using fallback:', aiErr.message);
+    if (useAIFill) {
+      try {
+        console.log(`🤖 Calling Gemini AI for food: "${foodName}"`);
+        aiData = await analyzeFood(foodName);
+        console.log('✅ Gemini AI result:', aiData);
+      } catch (aiErr) {
+        console.error('⚠️  Gemini failed, using fallback:', aiErr.message);
+        aiData = {
+          category: 'other',
+          storageLocation: 'pantry',
+          perishability: 'low',
+          advice: `Stored using default location.`,
+        };
+      }
+    } else {
+      // Use user-provided values when AI is disabled
+      console.log('🚫 AI auto-fill disabled, using user-provided values');
       aiData = {
-        category: 'other',
-        storageLocation: 'pantry',
-        perishability: 'low',
-        advice: `Stored using default location.`,
+        category: req.body.category || 'other',
+        storageLocation: req.body.location || 'pantry',
+        perishability: 'unknown',
+        advice: req.body.notes || '',
       };
     }
 
