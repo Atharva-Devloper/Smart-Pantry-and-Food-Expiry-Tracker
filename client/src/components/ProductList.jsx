@@ -6,10 +6,12 @@ import '../styles/ProductList.css';
 import EditProduct from './EditProduct';
 
 const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showAddToShoppingModal, setShowAddToShoppingModal] = useState(null);
 
   const handleEdit = (product) => {
     setEditingProduct(product);
@@ -98,6 +100,37 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
     setEditingProduct(null);
   };
 
+  const handleAddToShopping = async (quantity, priority) => {
+    if (!showAddToShoppingModal) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/shopping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: showAddToShoppingModal.name,
+          quantity: quantity || '1',
+          priority: priority || 'medium',
+          userId: user?._id,
+          category: showAddToShoppingModal.category,
+        }),
+      });
+
+      if (response.ok) {
+        setSuccessMessage(
+          `✅ "${showAddToShoppingModal.name}" added to shopping list!`
+        );
+        setShowAddToShoppingModal(null);
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError('Failed to add to shopping list');
+      }
+    } catch (error) {
+      console.error('Error adding to shopping list:', error);
+      setError('Error adding to shopping list');
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -146,6 +179,10 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
   return (
     <div className="product-list-container">
       <h2 className="list-title">Pantry Products</h2>
+
+      {successMessage && <div className="success-alert">{successMessage}</div>}
+
+      {error && <div className="error-alert">{error}</div>}
 
       {products.length === 0 ? (
         <div className="empty-list">
@@ -197,6 +234,13 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
 
                 <div className="product-actions">
                   <button
+                    onClick={() => setShowAddToShoppingModal(product)}
+                    className="shopping-button"
+                    title="Add to shopping list"
+                  >
+                    🛒 Add to Shopping
+                  </button>
+                  <button
                     onClick={() => handleEdit(product)}
                     className="edit-button"
                   >
@@ -222,6 +266,72 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
           onCancel={handleCancel}
         />
       )}
+
+      {showAddToShoppingModal && (
+        <AddToShoppingModal
+          product={showAddToShoppingModal}
+          onAdd={handleAddToShopping}
+          onClose={() => setShowAddToShoppingModal(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+const AddToShoppingModal = ({ product, onAdd, onClose }) => {
+  const [quantity, setQuantity] = useState(product.quantity || '1');
+  const [priority, setPriority] = useState('medium');
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Add to Shopping List</h3>
+          <button className="modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <p className="product-name-display">{product.name}</p>
+
+          <div className="modal-form-group">
+            <label htmlFor="shopping-qty">Quantity</label>
+            <input
+              id="shopping-qty"
+              type="text"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="Enter quantity"
+            />
+          </div>
+
+          <div className="modal-form-group">
+            <label htmlFor="shopping-priority">Priority</label>
+            <select
+              id="shopping-priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="cancel-btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="add-shopping-btn"
+            onClick={() => onAdd(quantity, priority)}
+          >
+            Add to Shopping List
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

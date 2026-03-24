@@ -1,60 +1,324 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import API_BASE_URL from '../config';
+import { useAuth } from '../context/AuthContext';
 import './WastePage.css';
 
-import API_BASE_URL from '../config';
-
 const WastePage = () => {
-  const [stats, setStats] = useState({ summary: { totalItems: 0, totalValue: 0 }, categories: [] });
-  const userId = "65f1a2b3c4d5e6f7a8b9c0d1"; 
+  const { user } = useAuth();
+  const [period, setPeriod] = useState(30);
+  const [timelineData, setTimelineData] = useState([]);
+  const [categoryTotals, setCategoryTotals] = useState([]);
+  const [dailyTotals, setDailyTotals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const COLORS = [
+    '#FF6B6B',
+    '#4ECDC4',
+    '#45B7D1',
+    '#FFA07A',
+    '#98D8C8',
+    '#F7DC6F',
+    '#BB8FCE',
+    '#85C1E2',
+    '#F8B195',
+    '#C1CDCD',
+  ];
+
+  const categoryEmojis = {
+    fruits: '🍎',
+    vegetables: '🥬',
+    dairy: '🥛',
+    meat: '🥩',
+    seafood: '🐟',
+    grains: '🌾',
+    snacks: '🍪',
+    beverages: '🥤',
+    condiments: '🧂',
+    frozen: '🧊',
+    baking: '🧁',
+    canned: '🥫',
+    other: '📦',
+  };
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchWasteData = async () => {
+      if (!user || !user._id) {
+        setError('User not authenticated');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await fetch(`${API_BASE_URL}/api/waste/analytics?userId=${userId}`);
+        setLoading(true);
+        setError('');
+        const response = await fetch(
+          `${API_BASE_URL}/api/waste/timeline/${user._id}?days=${period}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch waste data');
+        }
+
         const data = await response.json();
-        setStats(data);
-      } catch (error) {
-        console.error('Error fetching waste stats:', error);
+        setTimelineData(data.timelineData);
+        setCategoryTotals(data.categoryTotals);
+        setDailyTotals(data.dailyTotals);
+      } catch (err) {
+        console.error('Error fetching waste data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchStats();
-  }, []);
+
+    fetchWasteData();
+  }, [period, user]);
+
+  const getTotalWastedQuantity = () => {
+    return categoryTotals.reduce(
+      (sum, cat) => sum + (cat.totalQuantity || 0),
+      0
+    );
+  };
+
+  const getTotalWastedCount = () => {
+    return categoryTotals.reduce((sum, cat) => sum + (cat.totalCount || 0), 0);
+  };
+
+  const getPeriodLabel = () => {
+    if (period === 1) return 'Last 24 Hours';
+    if (period === 7) return 'Last 7 Days';
+    if (period === 30) return 'Last 30 Days';
+    return `Last ${period} Days`;
+  };
+
+  if (!user) {
+    return (
+      <div className="waste-container">
+        <div className="error-state">
+          <p>Please log in to view waste analytics</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="waste-container">
-      <h1>📉 Waste Analytics</h1>
-      
+      <h1>📊 Waste Tracking Analytics</h1>
+
+      {error && <div className="error-msg">{error}</div>}
+
+      {/* Period Selector */}
+      <div className="period-selector">
+        <button
+          className={`period-btn ${period === 1 ? 'active' : ''}`}
+          onClick={() => setPeriod(1)}
+        >
+          📅 Day
+        </button>
+        <button
+          className={`period-btn ${period === 7 ? 'active' : ''}`}
+          onClick={() => setPeriod(7)}
+        >
+          📆 Week
+        </button>
+        <button
+          className={`period-btn ${period === 30 ? 'active' : ''}`}
+          onClick={() => setPeriod(30)}
+        >
+          📋 Month
+        </button>
+      </div>
+
+      {/* Summary Cards */}
       <div className="stats-cards">
         <div className="stat-card">
           <h3>Total Items Wasted</h3>
-          <p className="stat-value">{stats.summary.totalItems}</p>
-          <span className="stat-period">Last 30 Days</span>
+          <p className="stat-value">{getTotalWastedCount()}</p>
+          <span className="stat-period">{getPeriodLabel()}</span>
         </div>
-        <div className="stat-card highlight">
-          <h3>Estimated Loss</h3>
-          <p className="stat-value">${stats.summary.totalValue.toFixed(2)}</p>
-          <span className="stat-period">Financial Impact</span>
+        <div className="stat-card">
+          <h3>Total Quantity Wasted</h3>
+          <p className="stat-value">{getTotalWastedQuantity()}</p>
+          <span className="stat-period">Units</span>
         </div>
       </div>
 
-      <div className="waste-breakdown">
-        <h2>Breakdown by Category</h2>
-        <div className="category-list">
-          {stats.categories.map(cat => (
-            <div key={cat._id} className="cat-stat-row">
-              <span className="cat-name">{cat._id}</span>
-              <div className="cat-bar-container">
-                <div 
-                  className="cat-bar" 
-                  style={{ width: `${(cat.count / stats.summary.totalItems) * 100}%` }}
-                ></div>
-              </div>
-              <span className="cat-count">{cat.count} items</span>
+      {loading ? (
+        <div className="loading">Loading waste analytics...</div>
+      ) : (
+        <>
+          {/* Daily Waste Trend */}
+          <div className="chart-section">
+            <h2>📈 Daily Waste Trend</h2>
+            <div className="chart-container">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={dailyTotals}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="_id"
+                    tick={{ fontSize: 12 }}
+                    interval={Math.floor(dailyTotals.length / 7) || 0}
+                  />
+                  <YAxis
+                    label={{
+                      value: 'Quantity Wasted',
+                      angle: -90,
+                      position: 'insideLeft',
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#f9f9f9',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                    formatter={(value) => [`${value} units`, 'Quantity']}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="totalQuantity"
+                    stroke="#FF6B6B"
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Quantity Wasted"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-          ))}
-          {stats.categories.length === 0 && <p>No data yet. Keep up the good work of zero waste!</p>}
-        </div>
-      </div>
+          </div>
+
+          {/* Category Breakdown - Stacked Bar Chart */}
+          <div className="chart-section">
+            <h2>🍎 Waste by Food Category</h2>
+            <div className="chart-container">
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={timelineData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
+                    interval={Math.floor(timelineData.length / 7) || 0}
+                  />
+                  <YAxis
+                    label={{
+                      value: 'Quantity',
+                      angle: -90,
+                      position: 'insideLeft',
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#f9f9f9',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                    formatter={(value) => [`${value} units`, 'Quantity']}
+                  />
+                  <Legend />
+                  {categoryTotals.map((cat, idx) => (
+                    <Bar
+                      key={cat._id}
+                      dataKey={cat._id}
+                      stackId="categories"
+                      fill={COLORS[idx % COLORS.length]}
+                      name={`${categoryEmojis[cat._id] || '📦'} ${cat._id}`}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Category Pie Chart */}
+          <div className="chart-section">
+            <h2>🥧 Total Waste Distribution</h2>
+            <div className="chart-container pie-container">
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={categoryTotals}
+                    dataKey="totalQuantity"
+                    nameKey="_id"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    label={({ _id, totalQuantity }) =>
+                      `${categoryEmojis[_id] || '📦'} ${_id}: ${totalQuantity}`
+                    }
+                  >
+                    {categoryTotals.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value) => [`${value} units`, 'Quantity']}
+                    contentStyle={{
+                      backgroundColor: '#f9f9f9',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Category Details Table */}
+          <div className="chart-section">
+            <h2>📋 Category Details</h2>
+            <div className="category-table">
+              <div className="table-header">
+                <div className="table-col">Food Type</div>
+                <div className="table-col">Items Wasted</div>
+                <div className="table-col">Total Quantity</div>
+              </div>
+              <div className="table-body">
+                {categoryTotals.length === 0 ? (
+                  <div className="table-row empty">
+                    <p>No waste data for this period. Great job!</p>
+                  </div>
+                ) : (
+                  categoryTotals.map((cat) => (
+                    <div key={cat._id} className="table-row">
+                      <div className="table-col">
+                        {categoryEmojis[cat._id] || '📦'} {cat._id}
+                      </div>
+                      <div className="table-col">{cat.totalCount}</div>
+                      <div className="table-col">{cat.totalQuantity}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
