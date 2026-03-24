@@ -13,6 +13,18 @@ const shoppingItemSchema = new mongoose.Schema(
     },
     category: {
       type: String,
+      enum: [
+        'fruits',
+        'vegetables',
+        'dairy',
+        'meat',
+        'grains',
+        'snacks',
+        'beverages',
+        'condiments',
+        'frozen',
+        'other',
+      ],
       default: 'other',
     },
     isPurchased: {
@@ -28,7 +40,12 @@ const shoppingItemSchema = new mongoose.Schema(
       type: String,
       enum: ['low', 'medium', 'high'],
       default: 'medium',
-    }
+    },
+    location: {
+      type: String,
+      enum: ['fridge', 'freezer', 'pantry', 'cupboard'],
+      default: 'pantry',
+    },
   },
   { timestamps: true }
 );

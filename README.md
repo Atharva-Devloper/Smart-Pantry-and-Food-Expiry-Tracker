@@ -29,25 +29,70 @@ A full-stack web application for tracking pantry items and monitoring food expir
 
 ### Prerequisites
 
-- Node.js (v18+)
-- MongoDB running locally
+- Node.js v18.17.0+ (or run `nvm use`)
+- MongoDB connection string (local or Atlas)
 
 ### Setup
 
 ```bash
-# Install dependencies
-npm install
-cd server && npm install
-cd ../client && npm install
+# 1. Clone the repo
+git clone <repo-url>
+cd Smart-Pantry-and-Food-Expiry-Tracker
 
-# Copy environment templates
-cp server/.env.example server/.env
-cp client/.env.example client/.env
+# 2. Install dependencies
+cd server && npm install && cd ..
+cd client && npm install && cd ..
 
-# Add your Gemini API key and JWT_SECRET to server/.env
+# 3. Configure environment variables
 
-# Start everything
-cd .. && npm run dev
+# Required - Server credentials
+cd server
+cp .env.example .env
+# Edit .env and add:
+#   MONGO_URI=your_mongodb_connection_string
+#   JWT_SECRET=your_random_secret
+#   GEMINI_API_KEY=your_google_api_key
+cd ..
+
+# Optional - Client config (has defaults, only needed if backend runs elsewhere)
+cd client
+cp .env.example .env
+cd ..
+
+# 4. Run in separate terminals
+
+# Terminal 1 - Server
+cd server && npm run dev
+
+# Terminal 2 - Client
+cd client && npm run dev
+```
+
+**Then visit:** http://localhost:5173
+
+## Testing with Sample Data
+
+### 1. Create a test account
+
+- Go to http://localhost:5173
+- Click "Register"
+- Create a test account (email: test@example.com, password: any password)
+
+### 2. Seed test pantry items (optional)
+
+```bash
+cd server
+node seed.js
+```
+
+This adds sample items (milk, apples, chicken, etc.) to your pantry for testing.
+
+### 3. Login and explore
+
+- Login with your test credentials
+- View the seeded pantry items
+- Try adding products, creating shopping lists, generating recipes, etc.
+
 ```
 
 Frontend: http://localhost:5173
@@ -78,23 +123,25 @@ Backend: http://localhost:5000
 ## Project Structure
 
 ```
+
 smart-pantry-tracker/
-├── client/                 # React frontend
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── hooks/
-│   │   └── utils/
-│   └── package.json
-├── server/                 # Express backend
-│   ├── models/
-│   ├── routes/
-│   ├── middleware/
-│   ├── controllers/
-│   └── index.js
-├── .env.example           # Environment variables template
+├── client/ # React frontend
+│ ├── public/
+│ ├── src/
+│ │ ├── components/
+│ │ ├── pages/
+│ │ ├── hooks/
+│ │ └── utils/
+│ └── package.json
+├── server/ # Express backend
+│ ├── models/
+│ ├── routes/
+│ ├── middleware/
+│ ├── controllers/
+│ └── index.js
+├── .env.example # Environment variables template
 └── README.md
+
 ```
 
 ## API Endpoints
@@ -128,3 +175,4 @@ smart-pantry-tracker/
 ## License
 
 ISC License
+```

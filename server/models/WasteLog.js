@@ -29,10 +29,6 @@ const wasteLogSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
-    loggedAt: {
-      type: Date,
-      default: Date.now,
-    }
   },
   { timestamps: true }
 );
