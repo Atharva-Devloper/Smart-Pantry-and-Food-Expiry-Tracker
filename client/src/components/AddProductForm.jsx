@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import '../styles/AddProductForm.css';
 import API_BASE_URL from '../config';
+import { useAuth } from '../context/AuthContext';
+import '../styles/AddProductForm.css';
 
 const AddProductForm = ({ onProductAdded }) => {
+  const { token, user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     quantity: '',
     expiryDate: '',
     category: 'other',
     location: 'pantry',
-    notes: ''
+    notes: '',
   });
 
   const [success, setSuccess] = useState('');
@@ -17,9 +19,9 @@ const AddProductForm = ({ onProductAdded }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -28,39 +30,63 @@ const AddProductForm = ({ onProductAdded }) => {
     setSuccess('');
     setError('');
 
+    if (!token || !user) {
+      setError('❌ You must be logged in to add products');
+      return;
+    }
+
     try {
+      const payload = {
+        ...formData,
+        quantity: parseInt(formData.quantity),
+      };
+
+      console.log('📤 Sending product to backend:', payload);
+      console.log('📍 API URL:', API_BASE_URL);
+      console.log('👤 User:', user?.name);
+
       const response = await fetch(`${API_BASE_URL}/products`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...formData,
-          quantity: parseInt(formData.quantity),
-          userId: '507f1f77bcf86cd799439011'
-        })
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
 
+      console.log('📥 Response status:', response.status);
+      const data = await response.json();
+      console.log('📥 Response data:', data);
+
       if (response.ok) {
-        setSuccess('Product added successfully!');
+        setSuccess('✅ Product added successfully!');
         setFormData({
           name: '',
           quantity: '',
           expiryDate: '',
           category: 'other',
           location: 'pantry',
-          notes: ''
+          notes: '',
         });
-        // Call parent callback to refresh product list
         if (onProductAdded) {
           onProductAdded();
         }
+        // Clear success after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
       } else {
-        const errorData = await response.json();
-        setError('Failed to add product: ' + errorData.message);
+        setError(
+          '❌ Failed to add product: ' + (data.message || response.statusText)
+        );
       }
     } catch (error) {
-      setError('Error adding product: ' + error.message);
+      console.error('🔴 Network error:', error);
+      setError(
+        '❌ Error adding product: ' +
+          error.message +
+          '\n\nMake sure the backend is running on ' +
+          API_BASE_URL
+      );
     }
   };
 
@@ -162,7 +188,9 @@ const AddProductForm = ({ onProductAdded }) => {
           />
         </div>
 
-        <button type="submit" className="submit-btn">Add Product</button>
+        <button type="submit" className="submit-btn">
+          Add Product
+        </button>
       </form>
 
       {success && <div className="success-message">{success}</div>}

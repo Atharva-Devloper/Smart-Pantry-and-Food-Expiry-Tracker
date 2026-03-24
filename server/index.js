@@ -8,8 +8,11 @@ const mongoose = require('mongoose');
 const { User, PantryItem } = require('./models');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smart_pantry';
+const PORT = 5000; // Fixed port to avoid conflicts
+const MONGODB_URI =
+  process.env.MONGO_URI ||
+  process.env.MONGODB_URI ||
+  'mongodb://127.0.0.1:27017/smart_pantry';
 
 console.log('Environment initialized:');
 console.log('- Port:', PORT);
@@ -19,7 +22,22 @@ console.log('- Gemini key loaded:', !!process.env.GEMINI_API_KEY);
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // Allow localhost on any port
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+
+      // Allow from environment variable
+      if (origin === process.env.CLIENT_URL) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   })
 );
@@ -78,6 +96,24 @@ app.get('/api/test/users', async (req, res) => {
   }
 });
 
+// Debug route to test product endpoint
+app.get('/api/debug/products', async (req, res) => {
+  try {
+    console.log('📋 Fetching all products for debug...');
+    const { PantryItem } = require('./models');
+    const products = await PantryItem.find().limit(5);
+    res.json({
+      message: 'Product endpoint is working',
+      count: products.length,
+      products,
+      baseUrl: `${req.protocol}://${req.get('host')}`,
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.use('/products', require('./routes/productRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/shopping', require('./routes/shoppingRoutes'));
@@ -97,22 +133,24 @@ app.use('*', (req, res) => {
 
 const startServer = (port) => {
   const numericPort = Number(port);
-  if (numericPort >= 65536) {
-    console.error('No available ports found below 65536');
-    process.exit(1);
-  }
-  
-  const server = app.listen(numericPort, () => {
-    console.log(`Server is running on port ${numericPort}`);
-    console.log(`Health check: http://localhost:${numericPort}/api/health`);
-  }).on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.log(`Port ${numericPort} is busy, trying ${numericPort + 1}...`);
-      startServer(numericPort + 1);
-    } else {
-      console.error('Server error:', err);
-    }
-  });
+
+  const server = app
+    .listen(numericPort, () => {
+      console.log(`✓ Server is running on port ${numericPort}`);
+      console.log(`  Health check: http://localhost:${numericPort}/api/health`);
+    })
+    .on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(
+          `✗ Port ${numericPort} is already in use. Please close the process using that port.`
+        );
+        console.error('   Run: lsof -i :' + numericPort);
+        process.exit(1);
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
+    });
 };
 
 startServer(PORT);

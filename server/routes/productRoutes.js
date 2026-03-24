@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PantryItem } = require('../models');
 const { analyzeFood } = require('../utils/gemini');
+const authMiddleware = require('../middleware/auth');
 
 // ---------- NORMALIZATION HELPERS ----------
 
@@ -40,12 +41,12 @@ const normalizeLocation = (loc) => {
   return map[loc?.toLowerCase()] || 'pantry';
 };
 
-// ---------- GET ALL PRODUCTS ----------
+// ---------- GET ALL PRODUCTS (Filtered by User) ----------
 
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { search, category, location, status, sort } = req.query;
-    let query = {};
+    let query = { userId: req.userId }; // Filter by logged-in user
 
     // Search by name
     if (search) {
@@ -72,7 +73,9 @@ router.get('/', async (req, res) => {
     if (sort === 'quantity') sortQuery = { quantity: -1 };
     if (sort === 'newest') sortQuery = { createdAt: -1 };
 
+    console.log(`📋 Fetching products for user: ${req.userId}`);
     const products = await PantryItem.find(query).sort(sortQuery);
+    console.log(`✅ Found ${products.length} products`);
     res.json(products);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -85,17 +88,19 @@ router.get('/summary', async (req, res) => {
   try {
     const totalItems = await PantryItem.countDocuments();
     const expiredItems = await PantryItem.countDocuments({ status: 'expired' });
-    const expiringSoon = await PantryItem.countDocuments({ status: 'expiring' });
-    
+    const expiringSoon = await PantryItem.countDocuments({
+      status: 'expiring',
+    });
+
     const categoryDistribution = await PantryItem.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } }
+      { $group: { _id: '$category', count: { $sum: 1 } } },
     ]);
 
     res.json({
       totalItems,
       expiredItems,
       expiringSoon,
-      categoryDistribution
+      categoryDistribution,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -104,32 +109,53 @@ router.get('/summary', async (req, res) => {
 
 // ---------- CREATE PRODUCT WITH AI ----------
 
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
+    console.log('📦 Received product creation request:', {
+      name: req.body.name,
+      quantity: req.body.quantity,
+      expiryDate: req.body.expiryDate,
+      userId: req.userId,
+    });
+
+    // Validate required fields
+    if (!req.body.name || !req.body.quantity || !req.body.expiryDate) {
+      return res.status(400).json({
+        message: 'Missing required fields: name, quantity, expiryDate',
+      });
+    }
+
     let aiData;
+    const foodName = String(req.body.name).trim();
 
     try {
-      aiData = await analyzeFood(req.body.name);
-    } catch (err) {
-      console.error('Gemini failed:', err.message);
+      console.log(`🤖 Calling Gemini AI for food: "${foodName}"`);
+      aiData = await analyzeFood(foodName);
+      console.log('✅ Gemini AI result:', aiData);
+    } catch (aiErr) {
+      console.error('⚠️  Gemini failed, using fallback:', aiErr.message);
       aiData = {
         category: 'other',
         storageLocation: 'pantry',
         perishability: 'low',
-        advice: '',
+        advice: `Stored using default location.`,
       };
     }
 
     const product = await PantryItem.create({
       ...req.body,
+      userId: req.userId, // Use authenticated user's ID
+      name: foodName,
       category: normalizeCategory(aiData.category),
       location: normalizeLocation(aiData.storageLocation),
       notes: aiData.advice,
     });
 
+    console.log('✅ Product created successfully:', product._id);
     res.status(201).json(product);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('❌ Error creating product:', err);
+    res.status(400).json({ message: `Error creating product: ${err.message}` });
   }
 });
 
@@ -164,26 +190,41 @@ router.put('/batch/status', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const deletedProduct = await PantryItem.findByIdAndDelete(req.params.id);
+    console.log(`🗑️  Deleting product: ${req.params.id}`);
+    const deletedProduct = await PantryItem.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId, // Only allow deletion of own products
+    });
 
     if (!deletedProduct) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res
+        .status(404)
+        .json({ message: 'Product not found or not authorized' });
     }
 
-    res.json({ message: 'Product deleted successfully' });
+    console.log('✅ Product deleted successfully');
+    res.json({
+      message: 'Product deleted successfully',
+      product: deletedProduct,
+    });
   } catch (err) {
+    console.error('❌ Error deleting product:', err);
     res.status(400).json({ message: err.message });
   }
 });
 
 // ---------- UPDATE PRODUCT ----------
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const updatedProduct = await PantryItem.findByIdAndUpdate(
-      req.params.id,
+    console.log(`✏️  Updating product: ${req.params.id}`);
+    const updatedProduct = await PantryItem.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.userId, // Only allow updates to own products
+      },
       req.body,
       {
         new: true,
@@ -192,11 +233,15 @@ router.put('/:id', async (req, res) => {
     );
 
     if (!updatedProduct) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res
+        .status(404)
+        .json({ message: 'Product not found or not authorized' });
     }
 
+    console.log('✅ Product updated successfully');
     res.json(updatedProduct);
   } catch (err) {
+    console.error('❌ Error updating product:', err);
     res.status(400).json({ message: err.message });
   }
 });

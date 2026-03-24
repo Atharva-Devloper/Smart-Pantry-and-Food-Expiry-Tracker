@@ -29,33 +29,38 @@ const EditProduct = ({ product, onSave, onCancel }) => {
     setMessage('');
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/products/${product._id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            quantity: parseInt(formData.quantity),
-            expiryDate: formData.expiryDate,
-          }),
-        }
-      );
+      const payload = {
+        name: formData.name,
+        quantity: parseInt(formData.quantity),
+        expiryDate: formData.expiryDate,
+      };
+
+      console.log('✏️  Updating product:', product._id, payload);
+
+      const response = await fetch(`${API_BASE_URL}/products/${product._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      console.log('📥 Update response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        setMessage('Product updated successfully!');
+        setMessage('✅ Product updated successfully!');
         setTimeout(() => {
           onSave(data);
         }, 1000);
       } else {
         const errorData = await response.json();
-        setMessage('Error: ' + errorData.message);
+        setMessage('❌ Error: ' + errorData.message);
       }
     } catch (error) {
-      setMessage('Error: ' + error.message);
+      console.error('🔴 Update error:', error);
+      setMessage('❌ Error: ' + error.message);
     } finally {
       setIsLoading(false);
     }
