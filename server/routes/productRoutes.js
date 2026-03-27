@@ -132,11 +132,11 @@ router.post('/', authMiddleware, async (req, res) => {
 
     if (useAIFill) {
       try {
-        console.log(`🤖 Calling Gemini AI for food: "${foodName}"`);
+        console.log(`🤖 Calling AI for food: "${foodName}"`);
         aiData = await analyzeFood(foodName);
-        console.log('✅ Gemini AI result:', aiData);
+        console.log('✅ AI result:', aiData);
       } catch (aiErr) {
-        console.error('⚠️  Gemini failed, using fallback:', aiErr.message);
+        console.error('⚠️  AI failed, using fallback:', aiErr.message);
         aiData = {
           category: 'other',
           storageLocation: 'pantry',

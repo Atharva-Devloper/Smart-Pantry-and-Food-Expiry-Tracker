@@ -1,14 +1,55 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
 // Initialize with API key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const MODEL_NAME = process.env.MODEL_NAME || 'llama-3.1-8b-instant';
 
 // Simple in-memory cache for recipe suggestions (expires after 1 hour)
 const recipeCache = new Map();
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 function getCacheKey(ingredients) {
-  return ingredients.sort().join('|');
+  return [...ingredients].sort().join('|');
+}
+
+function tryParseJsonStrict(text) {
+  const raw = (text || '').trim();
+  if (!raw) return null;
+
+  // First attempt: direct parse
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    // continue
+  }
+
+  // Second attempt: strip common fences (defensive)
+  const unfenced = raw.replace(/```(?:json)?|```/gi, '').trim();
+  try {
+    return JSON.parse(unfenced);
+  } catch (_) {
+    // continue
+  }
+
+  // Third attempt: extract first plausible JSON object/array
+  const firstObj = unfenced.match(/\{[\s\S]*\}/);
+  if (firstObj) {
+    try {
+      return JSON.parse(firstObj[0]);
+    } catch (_) {
+      // continue
+    }
+  }
+  const firstArr = unfenced.match(/\[[\s\S]*\]/);
+  if (firstArr) {
+    try {
+      return JSON.parse(firstArr[0]);
+    } catch (_) {
+      // continue
+    }
+  }
+
+  return null;
 }
 
 function getFallbackRecipes(ingredients) {
@@ -53,57 +94,38 @@ function getFallbackRecipes(ingredients) {
 }
 
 async function analyzeFood(foodName) {
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('GEMINI_API_KEY not found, using fallback data');
+  if (!process.env.GROQ_API_KEY) {
+    console.warn('GROQ_API_KEY not found, using fallback data');
     return getFallbackData(foodName);
   }
 
+  const prompt = `Return ONLY valid JSON (no markdown, no extra text).
+Schema:
+{"category":"fruits|vegetables|dairy|meat|grains|snacks|beverages|condiments|frozen|other","storageLocation":"fridge|freezer|pantry|cupboard","perishability":"high|medium|low","advice":"short sentence"}
+Food: ${foodName}`;
+
   try {
-    // Use the newer Gemini models available
-    const models = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-    ];
-    let model;
+    const completion = await groqClient.chat.completions.create({
+      model: MODEL_NAME,
+      messages: [
+        { role: 'system', content: 'You output JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 250,
+      temperature: 0.25,
+    });
 
-    for (const modelName of models) {
-      try {
-        model = genAI.getGenerativeModel({ model: modelName });
-        const testResult = await model.generateContent('OK');
-        console.log(`✅ Using Gemini model: ${modelName}`);
-        break;
-      } catch (err) {
-        console.log(`Trying next model...`);
-      }
+    const text = (completion.choices?.[0]?.message?.content || '').trim();
+    const parsed = tryParseJsonStrict(text);
+    if (!parsed) {
+      console.error('analyzeFood JSON parse error: empty/invalid JSON', 'response:', text);
+      return getFallbackData(foodName);
     }
 
-    if (!model) {
-      throw new Error('No compatible Gemini models available');
+    if (!parsed || !parsed.category || !parsed.storageLocation) {
+      throw new Error('Invalid analyzeFood JSON schema');
     }
 
-    const prompt = `
-You are a food classification system.
-
-Return ONLY valid JSON in this format:
-{
-  "category": "fruits | vegetables | dairy | meat | grains | snacks | beverages | condiments | frozen | other",
-  "storageLocation": "fridge | freezer | pantry | cupboard",
-  "perishability": "high | medium | low",
-  "advice": "short sentence"
-}
-
-Use lowercase values exactly as written above.
-
-Food: "${foodName}"
-`;
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
-    const cleaned = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
     console.log(
       `✅ AI Analysis for "${foodName}": ${parsed.category} → ${parsed.storageLocation}`
     );
@@ -124,8 +146,8 @@ function getFallbackData(foodName) {
 }
 
 async function suggestRecipes(ingredients) {
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('⚠️ No Gemini API key, using fallback recipes');
+  if (!process.env.GROQ_API_KEY) {
+    console.warn('⚠️ No GROQ API key, using fallback recipes');
     return getFallbackRecipes(ingredients);
   }
 
@@ -137,75 +159,51 @@ async function suggestRecipes(ingredients) {
     return cached.recipes;
   }
 
+  const prompt = `Return ONLY valid JSON array (no markdown, no extra text).
+Ingredients: ${ingredients.join(', ')}
+Format: [{"title":"Recipe Name","description":"Short description","ingredientsNeeded":["missing items"],"instructions":["step 1","step 2"]}]`;
+
   try {
-    // Use the newer Gemini models available
-    const models = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-    ];
-    let model;
+    const completion = await groqClient.chat.completions.create({
+      model: MODEL_NAME,
+      messages: [
+        { role: 'system', content: 'You output JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 400,
+      temperature: 0.4,
+    });
 
-    for (const modelName of models) {
-      try {
-        model = genAI.getGenerativeModel({ model: modelName });
-        const testResult = await model.generateContent('OK');
-        console.log(`✅ Using Gemini model for recipes: ${modelName}`);
-        break;
-      } catch (err) {
-        console.log(`⏭️ Trying next model...`);
-      }
+    const text = (completion.choices?.[0]?.message?.content || '').trim();
+    const parsed = tryParseJsonStrict(text);
+    if (!parsed) {
+      console.error('suggestRecipes JSON parse error: empty/invalid JSON', 'response:', text);
+      return getFallbackRecipes(ingredients);
     }
 
-    if (!model) {
-      throw new Error('No compatible Gemini models available');
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error('Invalid suggestRecipes JSON schema');
     }
 
-    const prompt = `
-You are a creative chef. Based on these ingredients in my pantry: ${ingredients.join(', ')}, suggest 3 simple recipes.
-
-Return ONLY valid JSON in this format:
-[
-  {
-    "title": "Recipe Name",
-    "description": "Short description",
-    "ingredientsNeeded": ["list", "of", "missing", "items"],
-    "instructions": ["step 1", "step 2"]
-  }
-]
-`;
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    let text = response.text();
-
-    // Strip markdown code blocks if present
-    text = text
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-
-    const parsed = JSON.parse(text);
-    console.log(`✅ Recipe suggestions generated`);
-    
     // Cache the result
     recipeCache.set(cacheKey, {
       recipes: parsed,
       timestamp: Date.now(),
     });
-    
+
+    console.log('✅ Recipe suggestions generated');
     return parsed;
   } catch (error) {
     console.error('❌ Error suggesting recipes:', error.message);
-    
-    // Check if it's a quota/rate limit error
-    if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('Quota exceeded')) {
+
+    if (
+      error.message.includes('429') ||
+      error.message.toLowerCase().includes('quota')
+    ) {
       console.warn('⚠️ API quota exceeded. Using fallback recipes.');
       return getFallbackRecipes(ingredients);
     }
-    
-    // For other errors, also use fallback
+
     return getFallbackRecipes(ingredients);
   }
 }

@@ -44,7 +44,7 @@ cd ../client && npm install
 cp server/.env.example server/.env
 cp client/.env.example client/.env
 
-# Add your Gemini API key and JWT_SECRET to server/.env
+# Add your Groq API key and JWT_SECRET to server/.env
 
 # Start everything
 cd .. && npm run dev
