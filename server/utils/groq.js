@@ -58,6 +58,60 @@ function tryParseJsonStrict(text) {
   return null;
 }
 
+function toStringArray(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((v) => typeof v === 'string')
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/[\n,]+/g)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function isValidRecipe(r) {
+  return (
+    r &&
+    typeof r.title === 'string' &&
+    r.title.trim() &&
+    typeof r.description === 'string' &&
+    r.description.trim() &&
+    toStringArray(r.ingredientsNeeded).length > 0 &&
+    // UI renders instructions as an ordered list; encourage "step-by-step" outputs
+    toStringArray(r.instructions).length >= 5
+  );
+}
+
+function normalizeRecipes(parsed, ingredients) {
+  const fallback = getFallbackRecipes(ingredients);
+  const arr = Array.isArray(parsed) ? parsed : [];
+
+  const valid = arr
+    .map((r) => ({
+      title: typeof r?.title === 'string' ? r.title.trim() : '',
+      description:
+        typeof r?.description === 'string' ? r.description.trim() : '',
+      ingredientsNeeded: toStringArray(r?.ingredientsNeeded),
+      instructions: toStringArray(r?.instructions),
+    }))
+    .filter((r) => isValidRecipe(r));
+
+  // Always return exactly 3 recipes; if the model returns fewer/more,
+  // slice or fill deterministically to keep UI stable.
+  if (valid.length >= 3) return valid.slice(0, 3);
+
+  const out = [];
+  for (let i = 0; i < 3; i++) {
+    out.push(valid[i] || fallback[i]);
+  }
+  return out;
+}
+
 function getFallbackRecipes(ingredients) {
   return [
     {
@@ -169,12 +223,20 @@ async function suggestRecipes(ingredients) {
   const cached = recipeCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     console.log('💾 Using cached recipes');
-    return cached.recipes;
+    // Re-normalize to keep output stable even if prompt/parsing logic changed.
+    return normalizeRecipes(cached.recipes, ingredients);
   }
 
-  const prompt = `Return ONLY valid JSON array (no markdown, no extra text).
-Ingredients: ${ingredients.join(', ')}
-Format: [{"title":"Recipe Name","description":"Short description","ingredientsNeeded":["missing items"],"instructions":["step 1","step 2"]}]`;
+  const prompt = `Return ONLY valid JSON (no markdown, no extra text).
+Return EXACTLY 3 recipes.
+Each recipe must be an object with:
+title (string),
+description (string),
+ingredientsNeeded (array of strings),
+instructions (array of 5-7 step strings).
+Ingredients I have: ${ingredients.join(', ')}
+Recipes JSON format:
+[{"title":"Recipe Name","description":"Short description","ingredientsNeeded":["missing items"],"instructions":["step 1","step 2","step 3","step 4","step 5","step 6","step 7"]}]`;
 
   try {
     const client = getGroqClient();
@@ -186,7 +248,7 @@ Format: [{"title":"Recipe Name","description":"Short description","ingredientsNe
         { role: 'system', content: 'You output JSON only.' },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 400,
+      max_tokens: 700,
       temperature: 0.4,
     });
 
@@ -201,18 +263,17 @@ Format: [{"title":"Recipe Name","description":"Short description","ingredientsNe
       return getFallbackRecipes(ingredients);
     }
 
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      throw new Error('Invalid suggestRecipes JSON schema');
-    }
+    // Normalize to exactly 3 valid recipes for stable UI.
+    const normalized = normalizeRecipes(parsed, ingredients);
 
     // Cache the result
     recipeCache.set(cacheKey, {
-      recipes: parsed,
+      recipes: normalized,
       timestamp: Date.now(),
     });
 
     console.log('✅ Recipe suggestions generated');
-    return parsed;
+    return normalized;
   } catch (error) {
     console.error('❌ Error suggesting recipes:', error.message);
 
@@ -228,4 +289,4 @@ Format: [{"title":"Recipe Name","description":"Short description","ingredientsNe
   }
 }
 
-module.exports = { analyzeFood, suggestRecipes };
+module.exports = { analyzeFood, suggestRecipes, getFallbackRecipes };
