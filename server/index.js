@@ -17,7 +17,7 @@ const MONGODB_URI =
 console.log('Environment initialized:');
 console.log('- Port:', PORT);
 console.log('- MongoDB URI configured:', !!MONGODB_URI);
-console.log('- Gemini key loaded:', !!process.env.GEMINI_API_KEY);
+console.log('- Groq key loaded:', !!process.env.GROQ_API_KEY);
 
 // Middleware
 app.use(

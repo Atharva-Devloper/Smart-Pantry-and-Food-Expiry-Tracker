@@ -95,11 +95,13 @@
 .recipe-section ol {
   padding-left: 1.2rem;
   font-size: 0.95rem;
+  color: #2c3e50; /* ensure visible on white card background */
 }
 
 .recipe-section li {
   margin: 0.5rem 0;
   line-height: 1.5;
+  color: #2c3e50; /* override global body text color */
 }
 
 .no-items {

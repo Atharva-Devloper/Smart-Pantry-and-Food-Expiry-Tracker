@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { PantryItem } = require('../models');
-const { suggestRecipes } = require('../utils/gemini');
+const { suggestRecipes, getFallbackRecipes } = require('../utils/groq');
 const authMiddleware = require('../middleware/auth');
 
 // Get recipe suggestions based on current pantry items
@@ -21,20 +21,24 @@ router.get('/suggest', authMiddleware, async (req, res) => {
 
     if (ingredientNames.length === 0) {
       console.log('⚠️ No ingredients in pantry');
-      return res.json([
-        {
-          title: 'Empty Pantry',
-          description: 'Add some items to your pantry to get recipe ideas!',
-          ingredientsNeeded: [],
-          instructions: [],
-        },
-      ]);
+      // Keep UI stable: always return 3 recipes with step-by-step instructions.
+      return res.json(getFallbackRecipes([]));
     }
 
     console.log(`🥘 Generating recipes for: ${ingredientNames.join(', ')}`);
     const recipes = await suggestRecipes(ingredientNames);
 
     console.log(`✅ Generated ${recipes.length} recipes`);
+    console.log(
+      '✅ Recipe fields:',
+      recipes.map((r) => ({
+        title: r?.title,
+        ingredientsNeeded: Array.isArray(r?.ingredientsNeeded)
+          ? r.ingredientsNeeded.length
+          : 'n/a',
+        instructions: Array.isArray(r?.instructions) ? r.instructions.length : 'n/a',
+      }))
+    );
     res.json(recipes);
   } catch (err) {
     console.error('❌ Recipe error:', err.message);

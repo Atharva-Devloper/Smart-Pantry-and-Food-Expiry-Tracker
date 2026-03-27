@@ -8,6 +8,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
+  const normalizeUser = (u) => {
+    if (!u) return null;
+    // Backend returns `user.id` on login/register, but Mongo docs use `_id`
+    return u._id ? u : { ...u, _id: u.id };
+  };
+
   const fetchUser = async (authToken) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
@@ -17,7 +23,7 @@ export const AuthProvider = ({ children }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setUser(data);
+        setUser(normalizeUser(data));
         setLoading(false);
       } else {
         localStorage.removeItem('token');
@@ -60,7 +66,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         setToken(data.token);
-        setUser(data.user);
+        setUser(normalizeUser(data.user));
         return { success: true };
       } else {
         return { success: false, message: data.message || 'Login failed' };
@@ -83,7 +89,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         setToken(data.token);
-        setUser(data.user);
+        setUser(normalizeUser(data.user));
         return { success: true };
       } else {
         return {
