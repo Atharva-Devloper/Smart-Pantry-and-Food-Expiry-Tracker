@@ -1,8 +1,14 @@
 const Groq = require('groq-sdk');
 
-// Initialize with API key
-const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const MODEL_NAME = process.env.MODEL_NAME || 'llama-3.1-8b-instant';
+let groqClient = null;
+
+function getGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  if (!groqClient) groqClient = new Groq({ apiKey });
+  return groqClient;
+}
 
 // Simple in-memory cache for recipe suggestions (expires after 1 hour)
 const recipeCache = new Map();
@@ -105,7 +111,10 @@ Schema:
 Food: ${foodName}`;
 
   try {
-    const completion = await groqClient.chat.completions.create({
+    const client = getGroqClient();
+    if (!client) return getFallbackData(foodName);
+
+    const completion = await client.chat.completions.create({
       model: MODEL_NAME,
       messages: [
         { role: 'system', content: 'You output JSON only.' },
@@ -118,7 +127,11 @@ Food: ${foodName}`;
     const text = (completion.choices?.[0]?.message?.content || '').trim();
     const parsed = tryParseJsonStrict(text);
     if (!parsed) {
-      console.error('analyzeFood JSON parse error: empty/invalid JSON', 'response:', text);
+      console.error(
+        'analyzeFood JSON parse error: empty/invalid JSON',
+        'response:',
+        text
+      );
       return getFallbackData(foodName);
     }
 
@@ -164,7 +177,10 @@ Ingredients: ${ingredients.join(', ')}
 Format: [{"title":"Recipe Name","description":"Short description","ingredientsNeeded":["missing items"],"instructions":["step 1","step 2"]}]`;
 
   try {
-    const completion = await groqClient.chat.completions.create({
+    const client = getGroqClient();
+    if (!client) return getFallbackRecipes(ingredients);
+
+    const completion = await client.chat.completions.create({
       model: MODEL_NAME,
       messages: [
         { role: 'system', content: 'You output JSON only.' },
@@ -177,7 +193,11 @@ Format: [{"title":"Recipe Name","description":"Short description","ingredientsNe
     const text = (completion.choices?.[0]?.message?.content || '').trim();
     const parsed = tryParseJsonStrict(text);
     if (!parsed) {
-      console.error('suggestRecipes JSON parse error: empty/invalid JSON', 'response:', text);
+      console.error(
+        'suggestRecipes JSON parse error: empty/invalid JSON',
+        'response:',
+        text
+      );
       return getFallbackRecipes(ingredients);
     }
 

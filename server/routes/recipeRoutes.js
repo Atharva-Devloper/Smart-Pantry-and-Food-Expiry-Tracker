@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { PantryItem } = require('../models');
-const { suggestRecipes } = require('../utils/gemini');
+const { suggestRecipes } = require('../utils/groq');
 const authMiddleware = require('../middleware/auth');
 
 // Get recipe suggestions based on current pantry items

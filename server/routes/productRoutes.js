@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { PantryItem } = require('../models');
-const { analyzeFood } = require('../utils/gemini');
+const { analyzeFood } = require('../utils/groq');
 const authMiddleware = require('../middleware/auth');
 
 // ---------- NORMALIZATION HELPERS ----------
