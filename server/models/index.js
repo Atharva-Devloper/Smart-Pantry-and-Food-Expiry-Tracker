@@ -4,6 +4,7 @@ const PantryItem = require('./PantryItem');
 const ShoppingItem = require('./ShoppingItem');
 const WasteLog = require('./WasteLog');
 const Recipe = require('./Recipe');
+const CalorieTracker = require('./CalorieTracker');
 
 module.exports = {
   User,
@@ -11,4 +12,5 @@ module.exports = {
   ShoppingItem,
   WasteLog,
   Recipe,
+  CalorieTracker,
 };

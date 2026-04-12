@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const { User, PantryItem } = require('./models');
 
 const app = express();
-const PORT = 5000; // Fixed port to avoid conflicts
+const PORT = 5001; // Fixed port to avoid conflicts
 const MONGODB_URI =
   process.env.MONGO_URI ||
   process.env.MONGODB_URI ||
@@ -119,6 +119,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/shopping', require('./routes/shoppingRoutes'));
 app.use('/api/waste', require('./routes/wasteRoutes'));
 app.use('/api/recipes', require('./routes/recipeRoutes'));
+app.use('/api/calories', require('./routes/calorieTracker'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

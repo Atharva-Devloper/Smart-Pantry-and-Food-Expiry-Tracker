@@ -37,6 +37,9 @@ const Navbar = () => {
             <li>
               <Link to="/waste" className={isActive('/waste')}>Waste Tracker</Link>
             </li>
+            <li>
+              <Link to="/calories" className={isActive('/calories')}>Calorie Tracker</Link>
+            </li>
             <li className="user-nav">
               <span className="user-name">Hi, {user.name.split(' ')[0]}</span>
               <button onClick={handleLogout} className="logout-btn">Logout</button>
