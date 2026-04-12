@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Package, ShoppingCart, ChefHat, Trash2, Users, LogOut, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
@@ -26,20 +27,40 @@ const Navbar = () => {
         {user ? (
           <>
             <li>
-              <Link to="/products" className={isActive('/products')}>Inventory</Link>
+              <Link to="/dashboard" className={isActive('/dashboard')}>
+                <LayoutDashboard size={18} /> Dashboard
+              </Link>
             </li>
             <li>
-              <Link to="/shopping" className={isActive('/shopping')}>Shopping List</Link>
+              <Link to="/products" className={isActive('/products')}>
+                <Package size={18} /> Inventory
+              </Link>
             </li>
             <li>
-              <Link to="/recipes" className={isActive('/recipes')}>AI Recipes</Link>
+              <Link to="/shopping" className={isActive('/shopping')}>
+                <ShoppingCart size={18} /> Shopping
+              </Link>
             </li>
             <li>
-              <Link to="/waste" className={isActive('/waste')}>Waste Tracker</Link>
+              <Link to="/recipes" className={isActive('/recipes')}>
+                <ChefHat size={18} /> Recipes
+              </Link>
+            </li>
+            <li>
+              <Link to="/waste" className={isActive('/waste')}>
+                <Trash2 size={18} /> Waste
+              </Link>
+            </li>
+            <li>
+              <Link to="/family" className={isActive('/family')}>
+                <Users size={18} /> Family
+              </Link>
             </li>
             <li className="user-nav">
-              <span className="user-name">Hi, {user.name.split(' ')[0]}</span>
-              <button onClick={handleLogout} className="logout-btn">Logout</button>
+              <span className="user-name"><User size={16} /> {user.name.split(' ')[0]}</span>
+              <button onClick={handleLogout} className="logout-btn">
+                <LogOut size={16} /> Logout
+              </button>
             </li>
           </>
         ) : (
