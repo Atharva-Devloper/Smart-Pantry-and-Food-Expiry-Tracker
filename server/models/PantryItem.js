@@ -58,6 +58,21 @@ const pantryItemSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'User ID is required'],
     },
+    familyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Family',
+      default: null,
+    },
+    addedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    lastModifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     notes: {
       type: String,
       maxlength: [500, 'Notes cannot exceed 500 characters'],
@@ -165,5 +180,22 @@ pantryItemSchema.pre('save', function () {
 pantryItemSchema.index({ userId: 1, expiryDate: 1 });
 pantryItemSchema.index({ userId: 1, status: 1 });
 pantryItemSchema.index({ userId: 1, category: 1 });
+pantryItemSchema.index({ familyId: 1, expiryDate: 1 });
+pantryItemSchema.index({ familyId: 1, status: 1 });
+
+// Static method to find items accessible by a user (personal + family shared)
+pantryItemSchema.statics.findAccessibleByUser = async function(userId, familyId) {
+  const query = {
+    $or: [
+      { userId }, // Personal items
+    ]
+  };
+  
+  if (familyId) {
+    query.$or.push({ familyId }); // Family shared items
+  }
+  
+  return this.find(query).sort({ expiryDate: 1 });
+};
 
 module.exports = mongoose.model('PantryItem', pantryItemSchema);

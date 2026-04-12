@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { PantryItem } = require('../models');
+const { PantryItem, Family, User } = require('../models');
 const { analyzeFood } = require('../utils/groq');
 const authMiddleware = require('../middleware/auth');
 
@@ -41,31 +41,44 @@ const normalizeLocation = (loc) => {
   return map[loc?.toLowerCase()] || 'pantry';
 };
 
-// ---------- GET ALL PRODUCTS (Filtered by User) ----------
+// ---------- GET ALL PRODUCTS (Personal + Family Shared) ----------
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { search, category, location, status, sort } = req.query;
-    let query = { userId: req.userId }; // Filter by logged-in user
+    const { search, category, location, status, sort, view } = req.query;
+    
+    // Get user's current family
+    const user = await User.findById(req.userId).select('currentFamilyId');
+    const currentFamilyId = user?.currentFamilyId;
+    
+    // Build query - get personal items OR family shared items
+    let query = {
+      $or: [{ userId: req.userId }] // Personal items
+    };
+    
+    // Include family items if user has a current family and not viewing personal only
+    if (currentFamilyId && view !== 'personal') {
+      query.$or.push({ familyId: currentFamilyId });
+    }
 
     // Search by name
     if (search) {
-      query.name = { $regex: search, $options: 'i' };
+      query = { ...query, name: { $regex: search, $options: 'i' } };
     }
 
     // Filter by category
     if (category && category !== 'all') {
-      query.category = category;
+      query = { ...query, category };
     }
 
     // Filter by location
     if (location && location !== 'all') {
-      query.location = location;
+      query = { ...query, location };
     }
 
     // Filter by status (fresh, expiring, expired)
     if (status && status !== 'all') {
-      query.status = status;
+      query = { ...query, status };
     }
 
     let sortQuery = { expiryDate: 1 }; // Default sort by expiry date
@@ -73,8 +86,12 @@ router.get('/', authMiddleware, async (req, res) => {
     if (sort === 'quantity') sortQuery = { quantity: -1 };
     if (sort === 'newest') sortQuery = { createdAt: -1 };
 
-    console.log(`📋 Fetching products for user: ${req.userId}`);
-    const products = await PantryItem.find(query).sort(sortQuery);
+    console.log(`📋 Fetching products for user: ${req.userId}${currentFamilyId ? ' + family: ' + currentFamilyId : ''}`);
+    const products = await PantryItem.find(query)
+      .populate('addedBy', 'name')
+      .populate('lastModifiedBy', 'name')
+      .populate('familyId', 'name')
+      .sort(sortQuery);
     console.log(`✅ Found ${products.length} products`);
     res.json(products);
   } catch (err) {
@@ -155,9 +172,15 @@ router.post('/', authMiddleware, async (req, res) => {
       };
     }
 
+    // Get user's current family to auto-share if applicable
+    const user = await User.findById(req.userId).select('currentFamilyId');
+    const familyId = user?.currentFamilyId || null;
+
     const product = await PantryItem.create({
       ...req.body,
       userId: req.userId, // Use authenticated user's ID
+      familyId: req.body.shareWithFamily ? familyId : null,
+      addedBy: req.userId,
       name: foodName,
       category: normalizeCategory(aiData.category),
       location: normalizeLocation(aiData.storageLocation),
@@ -206,16 +229,19 @@ router.put('/batch/status', async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     console.log(`🗑️  Deleting product: ${req.params.id}`);
-    const deletedProduct = await PantryItem.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.userId, // Only allow deletion of own products
-    });
-
-    if (!deletedProduct) {
-      return res
-        .status(404)
-        .json({ message: 'Product not found or not authorized' });
+    
+    const product = await PantryItem.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
     }
+    
+    // Check permissions
+    const canDelete = await checkDeletePermission(product, req.userId);
+    if (!canDelete) {
+      return res.status(403).json({ message: 'Not authorized to delete this product' });
+    }
+
+    const deletedProduct = await PantryItem.findByIdAndDelete(req.params.id);
 
     console.log('✅ Product deleted successfully');
     res.json({
@@ -228,28 +254,62 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Helper function to check delete permissions
+async function checkDeletePermission(product, userId) {
+  // User can always delete their own items
+  if (product.userId.toString() === userId.toString()) {
+    return true;
+  }
+  
+  // Check family permissions for shared items
+  if (product.familyId) {
+    const family = await Family.findById(product.familyId);
+    if (family) {
+      // Owner and admins can always delete
+      if (family.isAdmin(userId)) {
+        return true;
+      }
+      // Members can delete if settings allow
+      if (family.settings.allowMembersToDelete && family.isMember(userId)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
 // ---------- UPDATE PRODUCT ----------
 
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     console.log(`✏️  Updating product: ${req.params.id}`);
-    const updatedProduct = await PantryItem.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        userId: req.userId, // Only allow updates to own products
-      },
-      req.body,
+    
+    const product = await PantryItem.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    // Check permissions
+    const canEdit = await checkEditPermission(product, req.userId);
+    if (!canEdit) {
+      return res.status(403).json({ message: 'Not authorized to edit this product' });
+    }
+    
+    // Update with tracking
+    const updateData = {
+      ...req.body,
+      lastModifiedBy: req.userId
+    };
+    
+    const updatedProduct = await PantryItem.findByIdAndUpdate(
+      req.params.id,
+      updateData,
       {
         new: true,
         runValidators: true,
       }
-    );
-
-    if (!updatedProduct) {
-      return res
-        .status(404)
-        .json({ message: 'Product not found or not authorized' });
-    }
+    ).populate('addedBy', 'name').populate('lastModifiedBy', 'name');
 
     console.log('✅ Product updated successfully');
     res.json(updatedProduct);
@@ -258,5 +318,23 @@ router.put('/:id', authMiddleware, async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
+
+// Helper function to check edit permissions
+async function checkEditPermission(product, userId) {
+  // User can always edit their own items
+  if (product.userId.toString() === userId.toString()) {
+    return true;
+  }
+  
+  // Family members can edit shared items
+  if (product.familyId) {
+    const family = await Family.findById(product.familyId);
+    if (family && family.isMember(userId)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
 module.exports = router;

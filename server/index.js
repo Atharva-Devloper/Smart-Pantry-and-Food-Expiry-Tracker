@@ -119,7 +119,8 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/shopping', require('./routes/shoppingRoutes'));
 app.use('/api/waste', require('./routes/wasteRoutes'));
 app.use('/api/recipes', require('./routes/recipeRoutes'));
-app.use('/api/calories', require('./routes/calorieTracker'));
+app.use('/api/family', require('./routes/familyRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

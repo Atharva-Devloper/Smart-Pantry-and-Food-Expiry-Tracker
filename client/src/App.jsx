@@ -5,7 +5,8 @@ import ProductsPage from './components/ProductsPage';
 import ShoppingPage from './components/ShoppingPage';
 import RecipePage from './components/RecipePage';
 import WastePage from './components/WastePage';
-import CalorieTrackerPage from './components/CalorieTrackerPage';
+import Dashboard from './components/Dashboard';
+import Family from './components/Family';
 import Navbar from './components/Navbar';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -51,9 +52,14 @@ function AppContent() {
               <WastePage />
             </ProtectedRoute>
           } />
-          <Route path="/calories" element={
+          <Route path="/dashboard" element={
             <ProtectedRoute>
-              <CalorieTrackerPage />
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/family" element={
+            <ProtectedRoute>
+              <Family />
             </ProtectedRoute>
           } />
         </Routes>
