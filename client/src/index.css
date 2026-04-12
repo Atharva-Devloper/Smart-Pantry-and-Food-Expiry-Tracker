@@ -10,6 +10,20 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Design System Variables */
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  --bg-main: #f3f4f6;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+  --radius: 12px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 a {

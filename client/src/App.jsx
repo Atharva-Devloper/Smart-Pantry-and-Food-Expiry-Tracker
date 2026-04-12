@@ -5,6 +5,8 @@ import ProductsPage from './components/ProductsPage';
 import ShoppingPage from './components/ShoppingPage';
 import RecipePage from './components/RecipePage';
 import WastePage from './components/WastePage';
+import Dashboard from './components/Dashboard';
+import Family from './components/Family';
 import Navbar from './components/Navbar';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -48,6 +50,16 @@ function AppContent() {
           <Route path="/waste" element={
             <ProtectedRoute>
               <WastePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/family" element={
+            <ProtectedRoute>
+              <Family />
             </ProtectedRoute>
           } />
         </Routes>
