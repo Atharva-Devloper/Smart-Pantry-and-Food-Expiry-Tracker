@@ -56,6 +56,9 @@ const Navbar = () => {
                 <Users size={18} /> Family
               </Link>
             </li>
+            <li>
+              <Link to="/calories" className={isActive('/calories')}>Calorie Tracker</Link>
+            </li>
             <li className="user-nav">
               <span className="user-name"><User size={16} /> {user.name.split(' ')[0]}</span>
               <button onClick={handleLogout} className="logout-btn">

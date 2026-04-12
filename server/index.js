@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const { User, PantryItem } = require('./models');
 
 const app = express();
-const PORT = 5000; // Fixed port to avoid conflicts
+const PORT = 5001; // Fixed port to avoid conflicts
 const MONGODB_URI =
   process.env.MONGO_URI ||
   process.env.MONGODB_URI ||

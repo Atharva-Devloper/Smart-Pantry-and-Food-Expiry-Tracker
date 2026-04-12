@@ -230,6 +230,25 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
                       <span className="detail-value">{product.location}</span>
                     </div>
                   )}
+
+                  {product.nutrition && product.nutrition.calories > 0 && (
+                    <div className="nutrition-info">
+                      <div className="nutrition-header">
+                        <span className="detail-label">Nutrition per serving:</span>
+                      </div>
+                      <div className="nutrition-details">
+                        <div className="nutrition-item">
+                          <span className="nutrition-value">{product.nutrition.calories}</span>
+                          <span className="nutrition-unit">cal</span>
+                        </div>
+                        <div className="nutrition-macros">
+                          <span className="macro">P: {product.nutrition.protein}g</span>
+                          <span className="macro">C: {product.nutrition.carbs}g</span>
+                          <span className="macro">F: {product.nutrition.fat}g</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="product-actions">

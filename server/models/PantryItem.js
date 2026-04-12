@@ -83,6 +83,54 @@ const pantryItemSchema = new mongoose.Schema(
       enum: ['fresh', 'expiring', 'expired'],
       default: 'fresh',
     },
+    // Nutritional information per standard serving
+    nutrition: {
+      calories: {
+        type: Number,
+        min: [0, 'Calories cannot be negative'],
+        default: 0,
+      },
+      protein: {
+        type: Number,
+        min: [0, 'Protein cannot be negative'],
+        default: 0,
+      },
+      carbs: {
+        type: Number,
+        min: [0, 'Carbs cannot be negative'],
+        default: 0,
+      },
+      fat: {
+        type: Number,
+        min: [0, 'Fat cannot be negative'],
+        default: 0,
+      },
+      fiber: {
+        type: Number,
+        min: [0, 'Fiber cannot be negative'],
+        default: 0,
+      },
+      sugar: {
+        type: Number,
+        min: [0, 'Sugar cannot be negative'],
+        default: 0,
+      },
+      sodium: {
+        type: Number,
+        min: [0, 'Sodium cannot be negative'],
+        default: 0,
+      },
+      servingSize: {
+        type: Number,
+        min: [0, 'Serving size cannot be negative'],
+        default: 1,
+      },
+      servingUnit: {
+        type: String,
+        enum: ['grams', 'ounces', 'cups', 'pieces', 'tablespoons', 'teaspoons'],
+        default: 'pieces',
+      },
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt automatically
