@@ -30,38 +30,54 @@ A full-stack web application for tracking pantry items and monitoring food expir
 ### Prerequisites
 
 - Node.js (v18+)
-- MongoDB running locally
+- MongoDB running locally (install and start MongoDB service)
 
 ### Setup
 
-```bash
-# Install dependencies
-npm install
-cd server && npm install
-cd ../client && npm install
+1. **Install dependencies for the server:**
+   ```bash
+   cd server
+   npm ci
+   ```
 
-# Copy environment templates
-cp server/.env.example server/.env
-cp client/.env.example client/.env
+2. **Set up server environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `server/.env` and add your specific information:
+   - `GROQ_API_KEY`: Your Groq API key from https://console.groq.com/
+   - `JWT_SECRET`: A secure random string for JWT authentication (if not already set)
 
-# Add your Groq API key and JWT_SECRET to server/.env
+3. **Install dependencies for the client:**
+   ```bash
+   cd ../client
+   npm ci
+   ```
 
-# Start everything
-cd .. && npm run dev
-```
+4. **Set up client environment variables (optional):**
+   ```bash
+   cp .env.example .env
+   ```
+   The default values should work for local development.
 
-Frontend: http://localhost:5173
-Backend: http://localhost:5000
+5. **Start the development servers:**
+
+   In one terminal, start the backend server:
+   ```bash
+   cd server
+   npm run dev
+   ```
+
+   In another terminal, start the frontend client:
+   ```bash
+   cd client
+   npm run dev
+   ```
+
+Frontend will be available at: http://localhost:5173
+Backend API will be available at: http://localhost:5000
 
 ## Available Scripts
-
-### Root Level
-
-- `npm run dev` - Start both client and server in development mode
-- `npm run server` - Start only the backend server
-- `npm run client` - Start only the frontend
-- `npm run build` - Build the frontend for production
-- `npm run install-deps` - Install dependencies for all packages
 
 ### Client (client/)
 
@@ -78,22 +94,25 @@ Backend: http://localhost:5000
 ## Project Structure
 
 ```
-smart-pantry-tracker/
+Smart-Pantry-and-Food-Expiry-Tracker/
 ├── client/                 # React frontend
+│   ├── .env.example        # Frontend environment template
+│   ├── package.json
 │   ├── public/
 │   ├── src/
 │   │   ├── components/
-│   │   ├── pages/
-│   │   ├── hooks/
-│   │   └── utils/
-│   └── package.json
+│   │   ├── context/
+│   │   ├── styles/
+│   │   └── ...
+│   └── vite.config.js
 ├── server/                 # Express backend
+│   ├── .env.example        # Backend environment template
+│   ├── package.json
+│   ├── index.js
+│   ├── middleware/
 │   ├── models/
 │   ├── routes/
-│   ├── middleware/
-│   ├── controllers/
-│   └── index.js
-├── .env.example           # Environment variables template
+│   └── utils/
 └── README.md
 ```
 
