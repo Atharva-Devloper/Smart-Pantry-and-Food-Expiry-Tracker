@@ -6,353 +6,364 @@ import '../styles/ProductList.css';
 import EditProduct from './EditProduct';
 
 const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
-  const { token, user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showAddToShoppingModal, setShowAddToShoppingModal] = useState(null);
+    const { token, user } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [showAddToShoppingModal, setShowAddToShoppingModal] = useState(null);
 
-  const handleEdit = (product) => {
-    setEditingProduct(product);
-  };
+    const handleEdit = (product) => {
+        setEditingProduct(product);
+    };
 
-  const handleUpdate = async (updatedProduct) => {
-    try {
-      console.log('📝 Updating product:', updatedProduct._id);
+    const handleUpdate = async (updatedProduct) => {
+        try {
+            console.log('📝 Updating product:', updatedProduct._id);
 
-      const response = await fetch(
-        `${API_BASE_URL}/products/${updatedProduct._id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: 'include',
-          body: JSON.stringify(updatedProduct),
+            const response = await fetch(
+                `${API_BASE_URL}/products/${updatedProduct._id}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(updatedProduct),
+                }
+            );
+
+            console.log('📥 Update response:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Product updated successfully');
+                setEditingProduct(null);
+                if (onProductUpdated) {
+                    onProductUpdated(data);
+                }
+            } else {
+                const errorData = await response.json();
+                setError('❌ Failed to update product: ' + errorData.message);
+            }
+        } catch (error) {
+            console.error('🔴 Update error:', error);
+            setError('❌ Error updating product: ' + error.message);
         }
-      );
+    };
 
-      console.log('📥 Update response:', response.status);
+    const handleDelete = async (productId) => {
+        if (!window.confirm('Are you sure you want to delete this product?')) {
+            return;
+        }
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Product updated successfully');
+        try {
+            console.log('🗑️  Deleting product:', productId);
+            setLoading(true);
+
+            const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                credentials: 'include',
+            });
+
+            console.log('📥 Delete response:', response.status);
+
+            if (response.ok) {
+                console.log('✅ Product deleted successfully');
+                if (onProductDeleted) {
+                    onProductDeleted();
+                }
+            } else {
+                const errorData = await response.json();
+                setError('❌ Failed to delete product: ' + errorData.message);
+            }
+        } catch (error) {
+            console.error('🔴 Delete error:', error);
+            setError('❌ Error deleting product: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = (updatedProduct) => {
         setEditingProduct(null);
         if (onProductUpdated) {
-          onProductUpdated(data);
+            onProductUpdated();
         }
-      } else {
-        const errorData = await response.json();
-        setError('❌ Failed to update product: ' + errorData.message);
-      }
-    } catch (error) {
-      console.error('🔴 Update error:', error);
-      setError('❌ Error updating product: ' + error.message);
-    }
-  };
+    };
 
-  const handleDelete = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) {
-      return;
-    }
+    const handleCancel = () => {
+        setEditingProduct(null);
+    };
 
-    try {
-      console.log('🗑️  Deleting product:', productId);
-      setLoading(true);
+    const handleAddToShopping = async (quantity, quantityUnit, priority) => {
+        if (!showAddToShoppingModal) return;
 
-      const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: 'include',
-      });
+        try {
+            const parsedQty = Number(quantity);
+            const response = await fetch(`${API_BASE_URL}/api/shopping`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: showAddToShoppingModal.name,
+                    quantity:
+                        Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1,
+                    quantityUnit: quantityUnit || showAddToShoppingModal.quantityUnit || 'units',
+                    priority: priority || 'medium',
+                    userId: user?._id,
+                    category: showAddToShoppingModal.category,
+                }),
+            });
 
-      console.log('📥 Delete response:', response.status);
-
-      if (response.ok) {
-        console.log('✅ Product deleted successfully');
-        if (onProductDeleted) {
-          onProductDeleted();
+            if (response.ok) {
+                setSuccessMessage(
+                    `✅ "${showAddToShoppingModal.name}" added to shopping list!`
+                );
+                setShowAddToShoppingModal(null);
+                setTimeout(() => setSuccessMessage(''), 3000);
+            } else {
+                setError('Failed to add to shopping list');
+            }
+        } catch (error) {
+            console.error('Error adding to shopping list:', error);
+            setError('Error adding to shopping list');
         }
-      } else {
-        const errorData = await response.json();
-        setError('❌ Failed to delete product: ' + errorData.message);
-      }
-    } catch (error) {
-      console.error('🔴 Delete error:', error);
-      setError('❌ Error deleting product: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const handleSave = (updatedProduct) => {
-    setEditingProduct(null);
-    if (onProductUpdated) {
-      onProductUpdated();
-    }
-  };
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    };
 
-  const handleCancel = () => {
-    setEditingProduct(null);
-  };
+    const getExpiryStatus = (expiryDate) => {
+        if (!expiryDate) return { class: 'unknown', text: 'Unknown' };
 
-  const handleAddToShopping = async (quantity, priority) => {
-    if (!showAddToShoppingModal) return;
+        const today = new Date();
+        const expiry = new Date(expiryDate);
+        const diffTime = expiry - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/shopping`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: showAddToShoppingModal.name,
-          quantity: quantity || '1',
-          priority: priority || 'medium',
-          userId: user?._id,
-          category: showAddToShoppingModal.category,
-        }),
-      });
+        if (diffDays < 0) {
+            return { class: 'expired', text: 'Expired' };
+        } else if (diffDays <= 3) {
+            return { class: 'expiring-soon', text: `Expires in ${diffDays} days` };
+        } else {
+            return { class: 'fresh', text: 'Fresh' };
+        }
+    };
 
-      if (response.ok) {
-        setSuccessMessage(
-          `✅ "${showAddToShoppingModal.name}" added to shopping list!`
+    if (loading) {
+        return (
+            <div className="product-list-container">
+                <h2 className="list-title">Pantry Products</h2>
+                <div className="loading">Loading products...</div>
+            </div>
         );
-        setShowAddToShoppingModal(null);
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError('Failed to add to shopping list');
-      }
-    } catch (error) {
-      console.error('Error adding to shopping list:', error);
-      setError('Error adding to shopping list');
     }
-  };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getExpiryStatus = (expiryDate) => {
-    if (!expiryDate) return { class: 'unknown', text: 'Unknown' };
-
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffTime = expiry - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) {
-      return { class: 'expired', text: 'Expired' };
-    } else if (diffDays <= 3) {
-      return { class: 'expiring-soon', text: `Expires in ${diffDays} days` };
-    } else {
-      return { class: 'fresh', text: 'Fresh' };
+    if (error) {
+        return (
+            <div className="product-list-container">
+                <h2 className="list-title">Pantry Products</h2>
+                <div className="error-message">{error}</div>
+            </div>
+        );
     }
-  };
 
-  if (loading) {
     return (
-      <div className="product-list-container">
-        <h2 className="list-title">Pantry Products</h2>
-        <div className="loading">Loading products...</div>
-      </div>
-    );
-  }
+        <div className="product-list-container">
+            <h2 className="list-title">Pantry Products</h2>
 
-  if (error) {
-    return (
-      <div className="product-list-container">
-        <h2 className="list-title">Pantry Products</h2>
-        <div className="error-message">{error}</div>
-      </div>
-    );
-  }
+            {successMessage && <div className="success-alert">{successMessage}</div>}
 
-  return (
-    <div className="product-list-container">
-      <h2 className="list-title">Pantry Products</h2>
+            {error && <div className="error-alert">{error}</div>}
 
-      {successMessage && <div className="success-alert">{successMessage}</div>}
+            {products.length === 0 ? (
+                <div className="empty-list">
+                    <div className="empty-icon">📦</div>
+                    <h3>No products found</h3>
+                    <p>Add some products to get started with your pantry management!</p>
+                </div>
+            ) : (
+                <div className="product-grid">
+                    {products.map((product) => {
+                        const expiryStatus = getExpiryStatus(product.expiryDate);
 
-      {error && <div className="error-alert">{error}</div>}
+                        return (
+                            <div key={product._id} className="product-card">
+                                <div className="product-header">
+                                    <h3 className="product-name">{product.name}</h3>
+                                    <span className={`status-badge ${expiryStatus.class}`}>
+                                        {expiryStatus.text}
+                                    </span>
+                                </div>
 
-      {products.length === 0 ? (
-        <div className="empty-list">
-          <div className="empty-icon">📦</div>
-          <h3>No products found</h3>
-          <p>Add some products to get started with your pantry management!</p>
+                                <div className="product-details">
+                                    <div className="detail-item">
+                                        <span className="detail-label">Quantity:</span>
+                                        <span className="detail-value">
+                                            {product.quantity} {product.quantityUnit || 'units'}
+                                        </span>
+                                    </div>
+
+                                    <div className="detail-item">
+                                        <span className="detail-label">Expiry:</span>
+                                        <span className="detail-value">
+                                            {formatDate(product.expiryDate)}
+                                        </span>
+                                    </div>
+
+                                    {product.category && (
+                                        <div className="detail-item">
+                                            <span className="detail-label">Category:</span>
+                                            <span className="detail-value">{product.category}</span>
+                                        </div>
+                                    )}
+
+                                    {product.location && (
+                                        <div className="detail-item">
+                                            <span className="detail-label">Location:</span>
+                                            <span className="detail-value">{product.location}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="product-actions">
+                                    <button
+                                        onClick={() => setShowAddToShoppingModal(product)}
+                                        className="shopping-button"
+                                        title="Add to shopping list"
+                                    >
+                                        🛒 Add to Shopping
+                                    </button>
+                                    <button
+                                        onClick={() => handleEdit(product)}
+                                        className="edit-button"
+                                    >
+                                        ✏️ Edit
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(product._id)}
+                                        className="delete-button"
+                                    >
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {editingProduct && (
+                <EditProduct
+                    product={editingProduct}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                />
+            )}
+
+            {showAddToShoppingModal && (
+                <AddToShoppingModal
+                    product={showAddToShoppingModal}
+                    onAdd={handleAddToShopping}
+                    onClose={() => setShowAddToShoppingModal(null)}
+                />
+            )}
         </div>
-      ) : (
-        <div className="product-grid">
-          {products.map((product) => {
-            const expiryStatus = getExpiryStatus(product.expiryDate);
-
-            return (
-              <div key={product._id} className="product-card">
-                <div className="product-header">
-                  <h3 className="product-name">{product.name}</h3>
-                  <span className={`status-badge ${expiryStatus.class}`}>
-                    {expiryStatus.text}
-                  </span>
-                </div>
-
-                <div className="product-details">
-                  <div className="detail-item">
-                    <span className="detail-label">Quantity:</span>
-                    <span className="detail-value">{product.quantity}</span>
-                  </div>
-
-                  <div className="detail-item">
-                    <span className="detail-label">Expiry:</span>
-                    <span className="detail-value">
-                      {formatDate(product.expiryDate)}
-                    </span>
-                  </div>
-
-                  {product.category && (
-                    <div className="detail-item">
-                      <span className="detail-label">Category:</span>
-                      <span className="detail-value">{product.category}</span>
-                    </div>
-                  )}
-
-                  {product.location && (
-                    <div className="detail-item">
-                      <span className="detail-label">Location:</span>
-                      <span className="detail-value">{product.location}</span>
-                    </div>
-                  )}
-
-                  {product.nutrition && product.nutrition.calories > 0 && (
-                    <div className="nutrition-info">
-                      <div className="nutrition-header">
-                        <span className="detail-label">Nutrition per serving:</span>
-                      </div>
-                      <div className="nutrition-details">
-                        <div className="nutrition-item">
-                          <span className="nutrition-value">{product.nutrition.calories}</span>
-                          <span className="nutrition-unit">cal</span>
-                        </div>
-                        <div className="nutrition-macros">
-                          <span className="macro">P: {product.nutrition.protein}g</span>
-                          <span className="macro">C: {product.nutrition.carbs}g</span>
-                          <span className="macro">F: {product.nutrition.fat}g</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="product-actions">
-                  <button
-                    onClick={() => setShowAddToShoppingModal(product)}
-                    className="shopping-button"
-                    title="Add to shopping list"
-                  >
-                    🛒 Add to Shopping
-                  </button>
-                  <button
-                    onClick={() => handleEdit(product)}
-                    className="edit-button"
-                  >
-                    ✏️ Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product._id)}
-                    className="delete-button"
-                  >
-                    🗑️ Delete
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {editingProduct && (
-        <EditProduct
-          product={editingProduct}
-          onSave={handleSave}
-          onCancel={handleCancel}
-        />
-      )}
-
-      {showAddToShoppingModal && (
-        <AddToShoppingModal
-          product={showAddToShoppingModal}
-          onAdd={handleAddToShopping}
-          onClose={() => setShowAddToShoppingModal(null)}
-        />
-      )}
-    </div>
-  );
+    );
 };
 
 const AddToShoppingModal = ({ product, onAdd, onClose }) => {
-  const [quantity, setQuantity] = useState(product.quantity || '1');
-  const [priority, setPriority] = useState('medium');
+    const [quantity, setQuantity] = useState(product.quantity || '1');
+    const [quantityUnit, setQuantityUnit] = useState(product.quantityUnit || 'units');
+    const [priority, setPriority] = useState('medium');
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Add to Shopping List</h3>
-          <button className="modal-close" onClick={onClose}>
-            ✕
-          </button>
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3>Add to Shopping List</h3>
+                    <button className="modal-close" onClick={onClose}>
+                        ✕
+                    </button>
+                </div>
+
+                <div className="modal-body">
+                    <p className="product-name-display">{product.name}</p>
+
+                    <div className="modal-form-group">
+                        <label htmlFor="shopping-qty">Quantity</label>
+                        <input
+                            id="shopping-qty"
+                            type="text"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value)}
+                            placeholder="Enter quantity"
+                        />
+                    </div>
+
+                    <div className="modal-form-group">
+                        <label htmlFor="shopping-unit">Quantity Unit</label>
+                        <select
+                            id="shopping-unit"
+                            value={quantityUnit}
+                            onChange={(e) => setQuantityUnit(e.target.value)}
+                        >
+                            <option value="units">Units</option>
+                            <option value="g">Grams (g)</option>
+                            <option value="kg">Kilograms (kg)</option>
+                            <option value="ml">Milliliters (ml)</option>
+                            <option value="l">Liters (l)</option>
+                            <option value="oz">Ounces (oz)</option>
+                            <option value="lb">Pounds (lb)</option>
+                            <option value="cups">Cups</option>
+                            <option value="tbsp">Tablespoons (tbsp)</option>
+                            <option value="tsp">Teaspoons (tsp)</option>
+                            <option value="pack">Pack</option>
+                            <option value="bottle">Bottle</option>
+                            <option value="can">Can</option>
+                            <option value="box">Box</option>
+                        </select>
+                    </div>
+
+                    <div className="modal-form-group">
+                        <label htmlFor="shopping-priority">Priority</label>
+                        <select
+                            id="shopping-priority"
+                            value={priority}
+                            onChange={(e) => setPriority(e.target.value)}
+                        >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="modal-footer">
+                    <button className="cancel-btn" onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button
+                        className="add-shopping-btn"
+                        onClick={() => onAdd(quantity, quantityUnit, priority)}
+                    >
+                        Add to Shopping List
+                    </button>
+                </div>
+            </div>
         </div>
-
-        <div className="modal-body">
-          <p className="product-name-display">{product.name}</p>
-
-          <div className="modal-form-group">
-            <label htmlFor="shopping-qty">Quantity</label>
-            <input
-              id="shopping-qty"
-              type="text"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="Enter quantity"
-            />
-          </div>
-
-          <div className="modal-form-group">
-            <label htmlFor="shopping-priority">Priority</label>
-            <select
-              id="shopping-priority"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <button className="cancel-btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="add-shopping-btn"
-            onClick={() => onAdd(quantity, priority)}
-          >
-            Add to Shopping List
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default ProductList;
