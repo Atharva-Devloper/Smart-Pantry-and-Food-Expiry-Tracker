@@ -289,57 +289,207 @@ Recipes JSON format:
     }
 }
 
-const PER_UNIT_FOOD_CALORIES = [
-    { keys: ['banana'], calories: 105 },
-    { keys: ['apple'], calories: 95 },
-    { keys: ['orange'], calories: 62 },
-    { keys: ['egg'], calories: 78 },
-    { keys: ['bread slice', 'slice of bread'], calories: 80 },
-];
+/**
+ * Physical plausibility check (no food assumptions)
+ * Only checks: is this physically possible?
+ * Max density: ~9.5 kcal/gram (pure fat)
+ */
+function isPhysicallyPlausible(calories, quantity, unit) {
+    const qty = Number(quantity) || 0;
+    const cal = Number(calories) || 0;
 
-const UNIT_HEURISTIC_CALORIES = {
-    g: 1.8,
-    kg: 1800,
-    ml: 0.7,
-    l: 700,
-    units: 80,
-    pack: 220,
-    bottle: 180,
-    can: 140,
-    box: 260,
-    oz: 51,
-    lb: 816,
-    cups: 120,
-    tbsp: 14,
-    tsp: 5,
-};
+    if (cal < 0) return false;
+    if (qty <= 0) return false;
+
+    const unitStr = String(unit || '').trim().toLowerCase();
+
+    // Weight-based: max 9.5 kcal per gram (fat saturation)
+    if (unitStr === 'g') {
+        return cal <= qty * 9.5;
+    }
+    if (unitStr === 'kg') {
+        return cal <= qty * 1000 * 9.5;
+    }
+    if (unitStr === 'oz') {
+        return cal <= qty * 28.35 * 9.5;
+    }
+    if (unitStr === 'lb') {
+        return cal <= qty * 453.59 * 9.5;
+    }
+
+    // Liquid: same density as weight
+    if (unitStr === 'ml') {
+        return cal <= qty * 9.5;
+    }
+    if (unitStr === 'l') {
+        return cal <= qty * 1000 * 9.5;
+    }
+
+    // Pieces: loose upper bound (1500 kcal per piece is extreme but possible)
+    if (unitStr === 'pieces' || unitStr === 'units' || unitStr === 'pack') {
+        return cal <= qty * 1500;
+    }
+
+    // Unknown units: accept if positive
+    return true;
+}
+
+/**
+ * Density validation: checks if calorie density is realistic
+ * Most foods: 0.2 - 4 kcal/gram
+ * High-fat foods: up to 9 kcal/gram
+ */
+function isReasonableDensity(calories, quantity, unit) {
+    const qty = Number(quantity) || 0;
+    const cal = Number(calories) || 0;
+
+    if (qty <= 0 || cal < 0) return false;
+    if (cal === 0) return true;
+
+    const unitStr = String(unit || '').trim().toLowerCase();
+    let grams;
+
+    if (unitStr === 'g') grams = qty;
+    else if (unitStr === 'kg') grams = qty * 1000;
+    else if (unitStr === 'oz') grams = qty * 28.35;
+    else if (unitStr === 'lb') grams = qty * 453.59;
+    else if (unitStr === 'ml') grams = qty;
+    else if (unitStr === 'l') grams = qty * 1000;
+    else return true; // Unknown units: don't reject
+
+    const density = cal / grams;
+    return density >= 0.2 && density <= 9.5;
+}
+
+/**
+ * Quantity scaling validation: prevents unrealistic per-item calories
+ * Ensures multi-piece items have reasonable per-piece values
+ */
+function isReasonableTotalCalories(calories, quantity, unit) {
+    const qty = Number(quantity) || 0;
+    const cal = Number(calories) || 0;
+
+    if (qty <= 0 || cal < 0) return false;
+    if (cal === 0) return true;
+
+    const unitStr = String(unit || '').trim().toLowerCase();
+
+    // Only apply to countable units
+    if (unitStr === 'pieces' || unitStr === 'units') {
+        // Prevent unrealistically low per-item calories
+        return cal >= qty * 30;
+    }
+
+    return true;
+}
+
+/**
+ * Suspicious density check: soft upper guard for unrealistic density
+ * Density > 5 kcal/g is suspicious (only pure fats reach this)
+ * This is a WARNING only, not a rejection
+ */
+function isSuspiciousDensity(calories, quantity, unit) {
+    const qty = Number(quantity) || 0;
+    const cal = Number(calories) || 0;
+
+    if (qty <= 0 || cal < 0) return false;
+    if (cal === 0) return false;
+
+    const unitStr = String(unit || '').toLowerCase();
+    let grams;
+
+    if (unitStr === 'g') grams = qty;
+    else if (unitStr === 'kg') grams = qty * 1000;
+    else if (unitStr === 'ml') grams = qty;
+    else if (unitStr === 'l') grams = qty * 1000;
+    else return false;
+
+    const density = cal / grams;
+    return density > 5; // suspicious zone
+}
+
+/**
+ * Upper scaling sanity: prevents explosion on small measured quantities
+ * For tsp, tbsp, g, ml: cap at 200 kcal per unit
+ * Allows oil (~120 kcal/tbsp) and mayo (~100 kcal/tbsp)
+ * Catches sugar explosion (3 tsp → 765 kcal)
+ */
+function isReasonableUpperCalories(calories, quantity, unit) {
+    const qty = Number(quantity) || 0;
+    const cal = Number(calories) || 0;
+
+    if (qty <= 0 || cal < 0) return false;
+
+    const unitStr = String(unit || '').toLowerCase();
+
+    // Only apply to measurable units
+    if (['g', 'ml', 'tsp', 'tbsp'].includes(unitStr)) {
+        return cal <= qty * 200;
+    }
+
+    return true;
+}
+
+/**
+ * Normalize vague units to standard forms
+ * Helps reduce LLM confusion on ambiguous units
+ */
+function normalizeUnit(unit) {
+    const u = String(unit || '').toLowerCase().trim();
+
+    // Recognize common vague descriptors
+    if (u.includes('cup')) return 'cup';
+    if (u.includes('bowl')) return 'serving';
+    if (u.includes('plate')) return 'serving';
+    if (u.includes('tbsp')) return 'tbsp';
+    if (u.includes('tsp')) return 'tsp';
+    if (u.includes('glass')) return 'serving';
+    if (u.includes('slice')) return 'slices';
+
+    return u;
+}
+
+/**
+ * Smart fallback: unit-aware baseline (not food-based)
+ * Provides reasonable estimates without nutritional assumptions
+ */
+function getNeutralFallbackCalories(quantity, unit) {
+    const qty = Number(quantity) || 0;
+    if (qty <= 0) return 1;
+
+    const unitStr = String(unit || '').toLowerCase().trim();
+
+    // Weight-based: middle-ground density
+    if (unitStr === 'g' || unitStr === 'ml') {
+        return Math.round(qty * 1.5);
+    }
+
+    // Volume-based (cups, servings): generic item baseline
+    if (['cup', 'cups', 'serving', 'serving'].includes(unitStr)) {
+        return Math.round(qty * 120);
+    }
+
+    // Countable items: ~100 kcal per piece (conservative)
+    if (unitStr === 'pieces' || unitStr === 'units' || unitStr === 'slices') {
+        return Math.round(qty * 100);
+    }
+
+    // Small measures: ~25 kcal per tbsp, ~5 per tsp
+    if (unitStr === 'tbsp') return Math.round(qty * 25);
+    if (unitStr === 'tsp') return Math.round(qty * 5);
+
+    // Default: 50 kcal per unit
+    return Math.round(qty * 50);
+}
 
 const toSafeNutritionNumber = (v) => {
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : 0;
 };
 
-function getHeuristicCalories(foodName, quantity, unit) {
-    const qty = Number(quantity) || 0;
-    if (qty <= 0) return 0;
-
-    const normalizedUnit = String(unit || 'units').trim().toLowerCase();
-    const normalizedFood = String(foodName || '').trim().toLowerCase();
-
-    if (normalizedUnit === 'units') {
-        for (const entry of PER_UNIT_FOOD_CALORIES) {
-            if (entry.keys.some((k) => normalizedFood.includes(k))) {
-                return Math.max(1, Math.round(qty * entry.calories));
-            }
-        }
-    }
-
-    return Math.max(1, Math.round(qty * (UNIT_HEURISTIC_CALORIES[normalizedUnit] || 75)));
-}
-
 async function estimateConsumedNutrition(foodName, quantity, unit) {
     const qty = Number(quantity) || 0;
-    const normalizedUnit = String(unit || 'units').trim().toLowerCase();
+    const normalizedUnit = normalizeUnit(unit);
 
     if (qty <= 0) {
         return {
@@ -351,40 +501,48 @@ async function estimateConsumedNutrition(foodName, quantity, unit) {
             sugar: 0,
             sodium: 0,
             estimateSource: 'none',
+            confidence: 'low',
         };
     }
-
-    const fallbackEstimate = () => {
-        const calories = getHeuristicCalories(foodName, qty, normalizedUnit);
-        console.warn(
-            `[GroqNutrition] Using fallback estimate for ${qty} ${normalizedUnit} of ${foodName}: ${calories} kcal`
-        );
-        return {
-            calories,
-            protein: 0,
-            carbs: 0,
-            fat: 0,
-            fiber: 0,
-            sugar: 0,
-            sodium: 0,
-            estimateSource: 'fallback',
-        };
-    };
 
     try {
         const client = getGroqClient();
         if (!client) {
-            console.warn('[GroqNutrition] GROQ_API_KEY missing; client unavailable.');
-            return fallbackEstimate();
+            console.error(`[GroqNutrition] GROQ_API_KEY missing - no Groq available`);
+            const fallbackCals = getNeutralFallbackCalories(qty, normalizedUnit);
+            return {
+                calories: fallbackCals,
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                fiber: 0,
+                sugar: 0,
+                sodium: 0,
+                estimateSource: 'fallback',
+                confidence: 'low',
+            };
         }
 
-        const prompt = `Return ONLY valid JSON (no markdown, no extra text).
-Estimate TOTAL nutrition for the full consumed quantity.
-Do NOT return per 100g values.
-Schema:
-{"calories":number,"protein":number,"carbs":number,"fat":number,"fiber":number,"sugar":number,"sodium":number}
+        const prompt = `Return ONLY valid JSON (no extra text).
+
+Estimate TOTAL nutrition for the FULL consumed amount.
+Do NOT return per-100g values. Return what was ACTUALLY consumed.
+
+CRITICAL RULES:
+* You MUST calculate based on the FULL quantity
+* You MUST scale calories correctly with quantity
+* Most foods fall between 0.2 and 4 kcal per gram
+* High-fat foods may go up to 9 kcal per gram, but rarely
+* If the unit is vague (bowl, plate, serving), assume a realistic standard portion
+* DO NOT output values that imply unrealistic density
+* DO NOT underestimate multi-piece items
+* Respect the unit EXACTLY
+
 Food: ${foodName}
-Consumed quantity: ${qty} ${normalizedUnit}`;
+Quantity: ${qty} ${normalizedUnit}
+
+JSON Schema:
+{"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sugar": number, "sodium": number}`;
 
         const completion = await client.chat.completions.create({
             model: MODEL_NAME,
@@ -398,40 +556,88 @@ Consumed quantity: ${qty} ${normalizedUnit}`;
 
         const text = (completion.choices?.[0]?.message?.content || '').trim();
         const parsed = tryParseJsonStrict(text);
+
+        // Single retry mechanism for parsing failures
         if (!parsed) {
-            console.warn(
-                `[GroqNutrition] Invalid JSON response for ${foodName}; falling back. Raw: ${text.slice(0, 180)}`
-            );
-            return fallbackEstimate();
+            console.warn(`[GroqNutrition] PARSE FAILED on first attempt for "${foodName}" - retrying`);
+            const retryPrompt = prompt + "\n\nRecalculate carefully. The previous result was invalid or unrealistic.";
+
+            try {
+                const retryCompletion = await client.chat.completions.create({
+                    model: MODEL_NAME,
+                    messages: [
+                        { role: 'system', content: 'You output JSON only.' },
+                        { role: 'user', content: retryPrompt },
+                    ],
+                    max_tokens: 220,
+                    temperature: 0.1,
+                });
+                const retryText = (retryCompletion.choices?.[0]?.message?.content || '').trim();
+                parsed = tryParseJsonStrict(retryText);
+            } catch (retryError) {
+                console.error(`[GroqNutrition] RETRY FAILED for "${foodName}": ${retryError.message}`);
+            }
         }
 
-        const heuristicCalories = getHeuristicCalories(foodName, qty, normalizedUnit);
-        const groqCalories = toSafeNutritionNumber(parsed.calories);
-        const suspiciouslyLow = groqCalories < heuristicCalories * 0.35;
-        const suspiciouslyHigh = groqCalories > heuristicCalories * 3.5;
-
-        if (!groqCalories || suspiciouslyLow || suspiciouslyHigh) {
-            console.warn(
-                `[GroqNutrition] Correcting suspicious Groq calories for ${foodName}: groq=${groqCalories}, heuristic=${heuristicCalories}`
-            );
+        if (!parsed) {
+            console.error(`[GroqNutrition] PARSE FAILED (retried) for "${foodName}" (${qty}${normalizedUnit}). Raw: ${text.slice(0, 100)}`);
+            const fallbackCals = getNeutralFallbackCalories(qty, normalizedUnit);
             return {
-                calories: heuristicCalories,
-                protein: toSafeNutritionNumber(parsed.protein),
-                carbs: toSafeNutritionNumber(parsed.carbs),
-                fat: toSafeNutritionNumber(parsed.fat),
-                fiber: toSafeNutritionNumber(parsed.fiber),
-                sugar: toSafeNutritionNumber(parsed.sugar),
-                sodium: toSafeNutritionNumber(parsed.sodium),
-                estimateSource: 'groq-corrected',
+                calories: fallbackCals,
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                fiber: 0,
+                sugar: 0,
+                sodium: 0,
+                estimateSource: 'fallback',
+                confidence: 'low',
             };
         }
 
-        console.info(
-            `[GroqNutrition] Groq estimate accepted for ${qty} ${normalizedUnit} of ${foodName}: ${groqCalories} kcal`
-        );
+        const groqCalories = toSafeNutritionNumber(parsed.calories);
+        let confidence = 'high';
+        let finalCalories = groqCalories;
+
+        // Soft warning for suspicious density
+        if (isSuspiciousDensity(groqCalories, qty, normalizedUnit)) {
+            const clampedCals = Math.min(groqCalories, qty * 5);
+            if (clampedCals < groqCalories) {
+                console.warn(`[GroqNutrition] CLAMPED suspicious density for "${foodName}" (${qty}${normalizedUnit}): ${groqCalories} → ${clampedCals} kcal`);
+                finalCalories = clampedCals;
+                confidence = 'low';
+            } else {
+                console.warn(`[GroqNutrition] ⚠️ SUSPICIOUS density for "${foodName}" (${qty}${normalizedUnit}): ${groqCalories} kcal (>5 kcal/g)`);
+                confidence = 'medium';
+            }
+        }
+
+        // Hard validation: must pass all checks
+        if (
+            !isPhysicallyPlausible(finalCalories, qty, normalizedUnit) ||
+            !isReasonableDensity(finalCalories, qty, normalizedUnit) ||
+            !isReasonableTotalCalories(finalCalories, qty, normalizedUnit) ||
+            !isReasonableUpperCalories(finalCalories, qty, normalizedUnit)
+        ) {
+            console.error(`[GroqNutrition] VALIDATION FAILED for "${foodName}" (${qty}${normalizedUnit}): ${finalCalories} kcal (physics, density, scaling, or upper-limit check failed)`);
+            const fallbackCals = getNeutralFallbackCalories(qty, normalizedUnit);
+            return {
+                calories: fallbackCals,
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                fiber: 0,
+                sugar: 0,
+                sodium: 0,
+                estimateSource: 'fallback',
+                confidence: 'low',
+            };
+        }
+
+        console.info(`[GroqNutrition] OK "${foodName}" (${qty}${normalizedUnit}): ${finalCalories} kcal [confidence: ${confidence}]`);
 
         return {
-            calories: groqCalories,
+            calories: finalCalories,
             protein: toSafeNutritionNumber(parsed.protein),
             carbs: toSafeNutritionNumber(parsed.carbs),
             fat: toSafeNutritionNumber(parsed.fat),
@@ -439,10 +645,22 @@ Consumed quantity: ${qty} ${normalizedUnit}`;
             sugar: toSafeNutritionNumber(parsed.sugar),
             sodium: toSafeNutritionNumber(parsed.sodium),
             estimateSource: 'groq',
+            confidence,
         };
     } catch (error) {
-        console.error('estimateConsumedNutrition error:', error.message);
-        return fallbackEstimate();
+        console.error(`[GroqNutrition] ERROR for "${foodName}" (${qty}${normalizedUnit}): ${error.message}`);
+        const fallbackCals = getNeutralFallbackCalories(qty, normalizedUnit);
+        return {
+            calories: fallbackCals,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            fiber: 0,
+            sugar: 0,
+            sodium: 0,
+            estimateSource: 'fallback',
+            confidence: 'low',
+        };
     }
 }
 
@@ -452,7 +670,7 @@ async function estimateMealNutrition(items) {
             .map((item) => ({
                 foodName: String(item?.foodName || '').trim(),
                 quantity: Number(item?.quantity),
-                unit: String(item?.unit || 'units').trim().toLowerCase(),
+                unit: normalizeUnit(item?.unit),
             }))
             .filter((item) => item.foodName && Number.isFinite(item.quantity) && item.quantity > 0)
         : [];
@@ -461,9 +679,9 @@ async function estimateMealNutrition(items) {
 
     const client = getGroqClient();
     if (!client) {
-        console.warn('[GroqNutrition] GROQ_API_KEY missing for batch estimation; using fallback.');
+        console.error('[GroqNutrition] GROQ_API_KEY missing for batch estimation.');
         return normalizedItems.map((item) => ({
-            calories: getHeuristicCalories(item.foodName, item.quantity, item.unit),
+            calories: getNeutralFallbackCalories(item.quantity, item.unit),
             protein: 0,
             carbs: 0,
             fat: 0,
@@ -471,6 +689,7 @@ async function estimateMealNutrition(items) {
             sugar: 0,
             sodium: 0,
             estimateSource: 'fallback',
+            confidence: 'low',
         }));
     }
 
@@ -481,11 +700,24 @@ async function estimateMealNutrition(items) {
         unit: item.unit,
     }));
 
-    const prompt = `Return ONLY valid JSON (no markdown, no extra text).
+    const prompt = `Return ONLY valid JSON array (no extra text).
+
 Estimate TOTAL nutrition for EACH consumed ingredient.
-Do NOT return per 100g values.
-Return an array where each object follows:
-{"index":number,"calories":number,"protein":number,"carbs":number,"fat":number,"fiber":number,"sugar":number,"sodium":number}
+Do NOT return per-100g values. Return what was ACTUALLY consumed.
+
+CRITICAL RULES:
+* You MUST calculate based on the FULL quantity
+* You MUST scale calories correctly with quantity
+* Most foods fall between 0.2 and 4 kcal per gram
+* High-fat foods may go up to 9 kcal per gram, but rarely
+* If the unit is vague (bowl, plate, serving), assume a realistic standard portion
+* DO NOT output values that imply unrealistic density
+* DO NOT underestimate multi-piece items
+* Respect the given units EXACTLY
+
+Return array:
+[{"index": number, "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "sugar": number, "sodium": number}, ...]
+
 Ingredients:
 ${JSON.stringify(inputPayload)}`;
 
@@ -512,11 +744,12 @@ ${JSON.stringify(inputPayload)}`;
         });
 
         const results = normalizedItems.map((item, index) => {
-            const fallbackCalories = getHeuristicCalories(item.foodName, item.quantity, item.unit);
             const entry = byIndex.get(index);
             if (!entry) {
+                console.error(`[GroqNutrition] NO RESPONSE for "${item.foodName}" (${item.quantity}${item.unit})`);
+                const fallbackCals = getNeutralFallbackCalories(item.quantity, item.unit);
                 return {
-                    calories: fallbackCalories,
+                    calories: fallbackCals,
                     protein: 0,
                     carbs: 0,
                     fat: 0,
@@ -524,31 +757,53 @@ ${JSON.stringify(inputPayload)}`;
                     sugar: 0,
                     sodium: 0,
                     estimateSource: 'fallback',
+                    confidence: 'low',
                 };
             }
 
             const calories = toSafeNutritionNumber(entry.calories);
-            const suspiciouslyLow = calories < fallbackCalories * 0.35;
-            const suspiciouslyHigh = calories > fallbackCalories * 3.5;
+            let confidence = 'high';
+            let finalCalories = calories;
 
-            if (!calories || suspiciouslyLow || suspiciouslyHigh) {
-                console.warn(
-                    `[GroqNutrition] Correcting suspicious batch calories for ${item.foodName}: groq=${calories}, heuristic=${fallbackCalories}`
-                );
+            // Soft warning for suspicious density
+            if (isSuspiciousDensity(calories, item.quantity, item.unit)) {
+                const clampedCals = Math.min(calories, item.quantity * 5);
+                if (clampedCals < calories) {
+                    console.warn(`[GroqNutrition] CLAMPED suspicious density for "${item.foodName}" (${item.quantity}${item.unit}): ${calories} → ${clampedCals} kcal`);
+                    finalCalories = clampedCals;
+                    confidence = 'low';
+                } else {
+                    console.warn(`[GroqNutrition] ⚠️ SUSPICIOUS density for "${item.foodName}" (${item.quantity}${item.unit}): ${calories} kcal (>5 kcal/g)`);
+                    confidence = 'medium';
+                }
+            }
+
+            // Hard validation: must pass all checks
+            if (
+                !isPhysicallyPlausible(finalCalories, item.quantity, item.unit) ||
+                !isReasonableDensity(finalCalories, item.quantity, item.unit) ||
+                !isReasonableTotalCalories(finalCalories, item.quantity, item.unit) ||
+                !isReasonableUpperCalories(finalCalories, item.quantity, item.unit)
+            ) {
+                console.error(`[GroqNutrition] VALIDATION FAILED for "${item.foodName}" (${item.quantity}${item.unit}): ${finalCalories} kcal (physics, density, scaling, or upper-limit check failed)`);
+                const fallbackCals = getNeutralFallbackCalories(item.quantity, item.unit);
                 return {
-                    calories: fallbackCalories,
-                    protein: toSafeNutritionNumber(entry.protein),
-                    carbs: toSafeNutritionNumber(entry.carbs),
-                    fat: toSafeNutritionNumber(entry.fat),
-                    fiber: toSafeNutritionNumber(entry.fiber),
-                    sugar: toSafeNutritionNumber(entry.sugar),
-                    sodium: toSafeNutritionNumber(entry.sodium),
-                    estimateSource: 'groq-corrected',
+                    calories: fallbackCals,
+                    protein: 0,
+                    carbs: 0,
+                    fat: 0,
+                    fiber: 0,
+                    sugar: 0,
+                    sodium: 0,
+                    estimateSource: 'fallback',
+                    confidence: 'low',
                 };
             }
 
+            console.info(`[GroqNutrition] OK "${item.foodName}" (${item.quantity}${item.unit}): ${finalCalories} kcal [confidence: ${confidence}]`);
+
             return {
-                calories,
+                calories: finalCalories,
                 protein: toSafeNutritionNumber(entry.protein),
                 carbs: toSafeNutritionNumber(entry.carbs),
                 fat: toSafeNutritionNumber(entry.fat),
@@ -556,15 +811,16 @@ ${JSON.stringify(inputPayload)}`;
                 sugar: toSafeNutritionNumber(entry.sugar),
                 sodium: toSafeNutritionNumber(entry.sodium),
                 estimateSource: 'groq',
+                confidence,
             };
         });
 
         console.info(`[GroqNutrition] Batch estimated ${results.length} meal ingredients.`);
         return results;
     } catch (error) {
-        console.error('estimateMealNutrition error:', error.message);
+        console.error(`[GroqNutrition] EXCEPTION in batch: ${error.message}`);
         return normalizedItems.map((item) => ({
-            calories: getHeuristicCalories(item.foodName, item.quantity, item.unit),
+            calories: getNeutralFallbackCalories(item.quantity, item.unit),
             protein: 0,
             carbs: 0,
             fat: 0,
@@ -572,6 +828,7 @@ ${JSON.stringify(inputPayload)}`;
             sugar: 0,
             sodium: 0,
             estimateSource: 'fallback',
+            confidence: 'low',
         }));
     }
 }
