@@ -4,26 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/ShoppingPage.css';
 
 const ShoppingPage = () => {
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const [items, setItems] = useState([]);
     const [newItem, setNewItem] = useState({
         name: '',
         quantity: '1',
         quantityUnit: 'units',
+        category: 'other',
         priority: 'medium',
     });
     const [loading, setLoading] = useState(true);
     const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState('');
 
-    const userId = user?._id;
-
     const fetchItems = async () => {
-        if (!userId) return;
+        if (!token) return;
         try {
-            const response = await fetch(
-                `${API_BASE_URL}/api/shopping?userId=${userId}`
-            );
+            const response = await fetch(`${API_BASE_URL}/api/shopping`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
             const data = await response.json();
             setItems(data);
             setLoading(false);
@@ -35,10 +34,10 @@ const ShoppingPage = () => {
     };
 
     useEffect(() => {
-        if (userId) {
+        if (token) {
             fetchItems();
         }
-    }, [userId]);
+    }, [token]);
 
     const addItem = async (e) => {
         e.preventDefault();
@@ -47,7 +46,7 @@ const ShoppingPage = () => {
             return;
         }
 
-        if (!userId) {
+        if (!token) {
             setError('User not authenticated');
             return;
         }
@@ -56,15 +55,17 @@ const ShoppingPage = () => {
             const parsedQty = Number(newItem.quantity);
             const response = await fetch(`${API_BASE_URL}/api/shopping`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({
                     ...newItem,
                     quantity: Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1,
-                    userId,
                 }),
             });
             if (response.ok) {
-                setNewItem({ name: '', quantity: '1', quantityUnit: 'units', priority: 'medium' });
+                setNewItem({ name: '', quantity: '1', quantityUnit: 'units', category: 'other', priority: 'medium' });
                 setSuccessMessage('✅ Item added to shopping list!');
                 setError('');
                 fetchItems();
@@ -84,7 +85,10 @@ const ShoppingPage = () => {
                 `${API_BASE_URL}/api/shopping/${id}/purchase`,
                 {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
                     body: JSON.stringify({ moveToPantry }),
                 }
             );
@@ -96,7 +100,10 @@ const ShoppingPage = () => {
 
     const deleteItem = async (id) => {
         try {
-            await fetch(`${API_BASE_URL}/api/shopping/${id}`, { method: 'DELETE' });
+            await fetch(`${API_BASE_URL}/api/shopping/${id}`, { 
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
             fetchItems();
         } catch (error) {
             console.error('Error deleting item:', error);
@@ -135,6 +142,29 @@ const ShoppingPage = () => {
                                     }
                                     className="item-input"
                                 />
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="item-category">Category</label>
+                                <select
+                                    id="item-category"
+                                    value={newItem.category}
+                                    onChange={(e) =>
+                                        setNewItem({ ...newItem, category: e.target.value })
+                                    }
+                                    className="priority-select"
+                                >
+                                    <option value="fruits">Fruits</option>
+                                    <option value="vegetables">Vegetables</option>
+                                    <option value="dairy">Dairy</option>
+                                    <option value="meat">Meat</option>
+                                    <option value="grains">Grains</option>
+                                    <option value="snacks">Snacks</option>
+                                    <option value="beverages">Beverages</option>
+                                    <option value="condiments">Condiments</option>
+                                    <option value="frozen">Frozen</option>
+                                    <option value="other">Other</option>
+                                </select>
                             </div>
 
                             <div className="form-group">

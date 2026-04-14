@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
-  Users, Plus, UserPlus, Settings, Trash2, LogOut, 
-  Check, X, ChevronDown, Home, Mail, Crown, Shield,
-  AlertCircle, Loader2
+  Users, Plus, UserPlus, Trash2, LogOut, 
+  Check, X, Home, Crown, Shield,
+  AlertCircle, Loader2, Copy, Share2
 } from 'lucide-react';
 import API_BASE_URL from '../config';
 import '../styles/Family.css';
@@ -11,7 +11,6 @@ import '../styles/Family.css';
 const Family = () => {
   const { user } = useAuth();
   const [families, setFamilies] = useState([]);
-  const [pendingInvitations, setPendingInvitations] = useState([]);
   const [currentFamilyId, setCurrentFamilyId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -19,15 +18,16 @@ const Family = () => {
   
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState(null);
+  const [familyJoinCode, setFamilyJoinCode] = useState('');
+  const [codeLoading, setCodeLoading] = useState(false);
   
   // Form states
   const [newFamilyName, setNewFamilyName] = useState('');
   const [newFamilyDescription, setNewFamilyDescription] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('member');
+  const [joinCode, setJoinCode] = useState('');
 
   useEffect(() => {
     fetchFamilies();
@@ -44,7 +44,6 @@ const Family = () => {
       if (response.ok) {
         const data = await response.json();
         setFamilies(data.families);
-        setPendingInvitations(data.pendingInvitations);
         setCurrentFamilyId(data.currentFamilyId);
       } else {
         setError('Failed to load family data');
@@ -73,7 +72,6 @@ const Family = () => {
       });
 
       if (response.ok) {
-        const data = await response.json();
         setSuccessMessage('Family created successfully!');
         setShowCreateModal(false);
         setNewFamilyName('');
@@ -88,68 +86,71 @@ const Family = () => {
     }
   };
 
-  const inviteMember = async (e) => {
+  const joinFamily = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/family/${selectedFamily._id}/invite`, {
+      const response = await fetch(`${API_BASE_URL}/api/family/join-by-code`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          email: inviteEmail,
-          role: inviteRole
+          joinCode: joinCode.toUpperCase().trim()
         })
       });
 
       if (response.ok) {
-        setSuccessMessage('Invitation sent successfully!');
-        setShowInviteModal(false);
-        setInviteEmail('');
-        setInviteRole('member');
+        const data = await response.json();
+        setSuccessMessage(`Successfully joined ${data.familyName}!`);
+        setShowJoinModal(false);
+        setJoinCode('');
         fetchFamilies();
       } else {
         const error = await response.json();
-        setError(error.message || 'Failed to send invitation');
+        setError(error.message || 'Failed to join family');
       }
     } catch (err) {
-      setError('Error sending invitation');
+      setError('Error joining family');
     }
   };
 
-  const acceptInvitation = async (token) => {
+  const showJoinCodeModal = async (family) => {
     try {
-      const authToken = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/family/accept-invitation/${token}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${authToken}` }
+      setSelectedFamily(family);
+      setCodeLoading(true);
+      setFamilyJoinCode('');
+      setShowCodeModal(true);
+      
+      // Fetch the join code from the API
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/family/${family._id}/join-code`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
-        setSuccessMessage('Invitation accepted! Welcome to the family.');
-        fetchFamilies();
+        const data = await response.json();
+        setFamilyJoinCode(data.joinCode);
+        setCodeLoading(false);
       } else {
-        const error = await response.json();
-        setError(error.message || 'Failed to accept invitation');
+        const errorData = await response.json();
+        console.error('Failed to load family code:', response.status, errorData);
+        setError(errorData.message || 'Failed to load family code');
+        setShowCodeModal(false);
+        setCodeLoading(false);
       }
     } catch (err) {
-      setError('Error accepting invitation');
+      console.error('❌ Error loading family code:', err);
+      setError('Error loading family code: ' + err.message);
+      setShowCodeModal(false);
+      setCodeLoading(false);
     }
   };
 
-  const rejectInvitation = async (token) => {
-    try {
-      const authToken = localStorage.getItem('token');
-      await fetch(`${API_BASE_URL}/api/family/reject-invitation/${token}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      fetchFamilies();
-    } catch (err) {
-      console.error('Error rejecting invitation:', err);
-    }
+  const copyJoinCode = () => {
+    navigator.clipboard.writeText(familyJoinCode);
+    setSuccessMessage('Family code copied to clipboard!');
   };
 
   const switchFamily = async (familyId) => {
@@ -267,63 +268,45 @@ const Family = () => {
           </div>
         )}
 
-        {/* Pending Invitations */}
-        {pendingInvitations.length > 0 && (
-          <div className="invitations-section">
-            <h2>Pending Invitations</h2>
-            <div className="invitations-list">
-              {pendingInvitations.map((invitation) => (
-                <div key={invitation.invitationId} className="invitation-card">
-                  <div className="invitation-info">
-                    <h3>{invitation.familyName}</h3>
-                    <p>Role: {getRoleLabel(invitation.role)}</p>
-                    <p className="expires">
-                      Expires: {new Date(invitation.expiresAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="invitation-actions">
-                    <button
-                      className="btn btn-success"
-                      onClick={() => acceptInvitation(invitation.token)}
-                    >
-                      <Check size={18} /> Accept
-                    </button>
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => rejectInvitation(invitation.token)}
-                    >
-                      <X size={18} /> Decline
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* My Families */}
         <div className="families-section">
           <div className="section-header">
             <h2>My Families</h2>
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <Plus size={18} /> Create Family
-            </button>
+            <div className="header-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowCreateModal(true)}
+              >
+                <Plus size={18} /> Create Family
+              </button>
+              <button
+                className="btn btn-outline"
+                onClick={() => setShowJoinModal(true)}
+              >
+                <UserPlus size={18} /> Join with Code
+              </button>
+            </div>
           </div>
 
           {families.length === 0 ? (
             <div className="empty-state">
               <Home size={64} />
               <h3>No Families Yet</h3>
-              <p>Create a family to start sharing pantry items with your household members.</p>
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowCreateModal(true)}
-              >
-                <Plus size={18} /> Create Your First Family
-              </button>
+              <p>Create a family or join an existing one using a family code.</p>
+              <div className="empty-actions">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowCreateModal(true)}
+                >
+                  <Plus size={18} /> Create Family
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setShowJoinModal(true)}
+                >
+                  <UserPlus size={18} /> Join Family
+                </button>
+              </div>
             </div>
           ) : (
             <div className="families-grid">
@@ -390,24 +373,10 @@ const Family = () => {
                       {isAdmin && (
                         <button
                           className="btn btn-outline"
-                          onClick={() => {
-                            setSelectedFamily(family);
-                            setShowInviteModal(true);
-                          }}
+                          onClick={() => showJoinCodeModal(family)}
+                          title="Share family code with others"
                         >
-                          <UserPlus size={16} /> Invite
-                        </button>
-                      )}
-                      {myRole === 'owner' && (
-                        <button
-                          className="btn btn-icon"
-                          onClick={() => {
-                            setSelectedFamily(family);
-                            setShowSettingsModal(true);
-                          }}
-                          title="Settings"
-                        >
-                          <Settings size={16} />
+                          <Share2 size={16} /> Share Code
                         </button>
                       )}
                       {myRole !== 'owner' && (
@@ -470,46 +439,92 @@ const Family = () => {
           </div>
         )}
 
-        {/* Invite Member Modal */}
-        {showInviteModal && selectedFamily && (
-          <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+        {/* Join Family by Code Modal */}
+        {showJoinModal && (
+          <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>Invite to {selectedFamily.name}</h2>
-                <button className="modal-close" onClick={() => setShowInviteModal(false)}>
+                <h2>Join a Family</h2>
+                <button className="modal-close" onClick={() => setShowJoinModal(false)}>
                   <X size={20} />
                 </button>
               </div>
-              <form onSubmit={inviteMember}>
+              <form onSubmit={joinFamily}>
                 <div className="form-group">
-                  <label>Email Address *</label>
-                  <div className="input-with-icon">
-                    <Mail size={18} />
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="family.member@email.com"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Role</label>
-                  <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
-                    <option value="member">Member - Can view and edit shared items</option>
-                    <option value="admin">Admin - Can manage members and settings</option>
-                  </select>
+                  <label>Enter Family Code *</label>
+                  <p className="help-text">Ask the family owner to share their 8-character code with you</p>
+                  <input
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="e.g., ABC12345"
+                    maxLength="8"
+                    required
+                  />
                 </div>
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setShowInviteModal(false)}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowJoinModal(false)}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    <Mail size={16} /> Send Invitation
+                  <button type="submit" className="btn btn-primary" disabled={loading}>
+                    {loading ? <Loader2 size={16} className="spinner" /> : <UserPlus size={16} />}
+                    Join Family
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Share Family Code Modal */}
+        {showCodeModal && selectedFamily && (
+          <div className="modal-overlay" onClick={() => setShowCodeModal(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Share {selectedFamily.name} Code</h2>
+                <button className="modal-close" onClick={() => setShowCodeModal(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body">
+                <p className="code-info">Share this code with family members so they can join your family.</p>
+                {codeLoading ? (
+                  <div className="code-loading">
+                    <Loader2 className="spinner" size={32} />
+                    <p>Loading code...</p>
+                  </div>
+                ) : familyJoinCode ? (
+                  <div className="code-display">
+                    <div className="code-box">
+                      <span className="code-text">{familyJoinCode}</span>
+                      <button 
+                        type="button"
+                        className="btn-copy"
+                        onClick={() => copyJoinCode()}
+                        title="Copy code to clipboard"
+                      >
+                        <Copy size={16} />
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="code-error">
+                    <AlertCircle size={24} />
+                    <p>Unable to load family code</p>
+                  </div>
+                )}
+                <p className="code-instruction">Recipients should enter this code in the "Join with Code" option.</p>
+              </div>
+              <div className="modal-actions">
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setShowCodeModal(false)}
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         )}

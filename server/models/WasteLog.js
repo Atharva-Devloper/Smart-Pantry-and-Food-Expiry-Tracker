@@ -49,6 +49,11 @@ const wasteLogSchema = new mongoose.Schema(
             ref: 'User',
             required: true,
         },
+        familyId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Family',
+            default: null,
+        },
         loggedAt: {
             type: Date,
             default: Date.now,

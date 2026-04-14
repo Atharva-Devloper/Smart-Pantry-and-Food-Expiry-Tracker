@@ -222,9 +222,12 @@ const buildTimelinePayload = async (userId, days) => {
 };
 
 // Log a wasted item (usually called when deleting from pantry with a reason)
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
     try {
-        const waste = new WasteLog(req.body);
+        const waste = new WasteLog({
+            ...req.body,
+            userId: req.userId
+        });
         const newLog = await waste.save();
         res.status(201).json(newLog);
     } catch (err) {
@@ -233,16 +236,16 @@ router.post('/', async (req, res) => {
 });
 
 // Get waste analytics for a user
-router.get('/analytics', async (req, res) => {
+router.get('/analytics', authMiddleware, async (req, res) => {
     try {
-        const { userId, days = 30 } = req.query;
+        const { days = 30 } = req.query;
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - parseInt(days));
 
         const stats = await WasteLog.aggregate([
             {
                 $match: {
-                    userId: new mongoose.Types.ObjectId(userId),
+                    userId: new mongoose.Types.ObjectId(req.userId),
                     loggedAt: { $gte: startDate },
                 },
             },
@@ -259,7 +262,7 @@ router.get('/analytics', async (req, res) => {
         const categoryBreakdown = await WasteLog.aggregate([
             {
                 $match: {
-                    userId: new mongoose.Types.ObjectId(userId),
+                    userId: new mongoose.Types.ObjectId(req.userId),
                     loggedAt: { $gte: startDate },
                 },
             },

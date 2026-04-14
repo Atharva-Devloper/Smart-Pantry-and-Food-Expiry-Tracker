@@ -2,12 +2,14 @@ import { Route, Routes, Navigate } from 'react-router-dom';
 import './App.css';
 import HomePage from './components/HomePage';
 import ProductsPage from './components/ProductsPage';
+import AddProductPage from './components/AddProductPage';
 import ShoppingPage from './components/ShoppingPage';
 import RecipePage from './components/RecipePage';
 import WastePage from './components/WastePage';
 import CalorieTrackerPage from './components/CalorieTrackerPage';
 import Dashboard from './components/Dashboard';
 import Family from './components/Family';
+import AcceptInvitation from './components/AcceptInvitation';
 import Navbar from './components/Navbar';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -29,13 +31,23 @@ function AppContent() {
             <Navbar />
             <div className="main-content">
                 <Routes>
-                    <Route path="/" element={<HomePage />} />
+                    <Route path="/" element={
+                        <ProtectedRoute>
+                            <Dashboard />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/home" element={<HomePage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
 
                     <Route path="/products" element={
                         <ProtectedRoute>
                             <ProductsPage />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/add-product" element={
+                        <ProtectedRoute>
+                            <AddProductPage />
                         </ProtectedRoute>
                     } />
                     <Route path="/shopping" element={
@@ -58,14 +70,14 @@ function AppContent() {
                             <CalorieTrackerPage />
                         </ProtectedRoute>
                     } />
-                    <Route path="/dashboard" element={
-                        <ProtectedRoute>
-                            <Dashboard />
-                        </ProtectedRoute>
-                    } />
                     <Route path="/family" element={
                         <ProtectedRoute>
                             <Family />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/family/accept-invitation/:token" element={
+                        <ProtectedRoute>
+                            <AcceptInvitation />
                         </ProtectedRoute>
                     } />
                 </Routes>

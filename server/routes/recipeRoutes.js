@@ -1,19 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { PantryItem } = require('../models');
+const { PantryItem, User } = require('../models');
 const { suggestRecipes, getFallbackRecipes } = require('../utils/groq');
 const authMiddleware = require('../middleware/auth');
 
-// Get recipe suggestions based on current pantry items
+// Get recipe suggestions based on current pantry items (personal + family)
 router.get('/suggest', authMiddleware, async (req, res) => {
   try {
     console.log('🍳 Recipe suggestion requested by user:', req.userId);
 
-    // Get items that are fresh or expiring soon
-    const items = await PantryItem.find({
-      userId: req.userId,
+    // Get user's current family
+    const user = await User.findById(req.userId).select('currentFamilyId');
+    const currentFamilyId = user?.currentFamilyId;
+
+    // Build query - personal items + family items if applicable
+    let query = {
+      $or: [{ userId: req.userId }],
       status: { $in: ['fresh', 'expiring'] },
-    }).limit(10);
+    };
+
+    if (currentFamilyId) {
+      query.$or.push({ familyId: currentFamilyId });
+    }
+
+    // Get items that are fresh or expiring soon
+    const items = await PantryItem.find(query).limit(10);
 
     console.log(`📦 Found ${items.length} items for recipe suggestions`);
 

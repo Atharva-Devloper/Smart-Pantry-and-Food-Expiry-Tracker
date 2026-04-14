@@ -1,52 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
 const { User, Family, PantryItem } = require('../models');
 const { protect } = require('../utils/auth');
 
-// Generate unique invitation token
-const generateToken = () => {
-  return crypto.randomBytes(32).toString('hex');
-};
-
-// Get user's families and pending invitations
+// Get user's families
 router.get('/my-families', protect, async (req, res) => {
   try {
     const userId = req.user._id;
-    const userEmail = req.user.email.toLowerCase();
 
     // Find families where user is a member
     const families = await Family.find({ 'members.userId': userId })
       .populate('members.userId', 'name email')
-      .select('-invitations');
-
-    // Find pending invitations for this user
-    const familiesWithInvitations = await Family.find({
-      'invitations.email': userEmail,
-      'invitations.status': 'pending'
-    }).select('name invitations');
-
-    const pendingInvitations = familiesWithInvitations.map(family => {
-      const invitation = family.invitations.find(
-        inv => inv.email.toLowerCase() === userEmail && inv.status === 'pending'
-      );
-      return {
-        familyId: family._id,
-        familyName: family.name,
-        invitationId: invitation._id,
-        role: invitation.role,
-        invitedBy: invitation.invitedBy,
-        expiresAt: invitation.expiresAt,
-        token: invitation.token
-      };
-    });
+      .select('-createdAt -updatedAt');
 
     // Get current family from user
     const user = await User.findById(userId).select('currentFamilyId');
 
     res.json({
       families,
-      pendingInvitations,
       currentFamilyId: user.currentFamilyId
     });
   } catch (err) {
@@ -65,10 +36,22 @@ router.post('/create', protect, async (req, res) => {
       return res.status(400).json({ message: 'Family name must be at least 2 characters' });
     }
 
+    // Generate join code
+    function generateJoinCode() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const timestamp = Date.now().toString(36).toUpperCase();
+      let code = timestamp.slice(-4);
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code.substring(0, 8);
+    }
+
     // Create family with user as owner
     const family = new Family({
       name: name.trim(),
       description: description?.trim() || '',
+      joinCode: generateJoinCode(),
       members: [{
         userId,
         role: 'owner',
@@ -76,217 +59,196 @@ router.post('/create', protect, async (req, res) => {
       }]
     });
 
+    console.log('👨‍👩‍👧 Creating family:', name, 'with code:', family.joinCode);
     await family.save();
+    console.log('✅ Family created with joinCode:', family.joinCode);
 
     // Update user's current family
     await User.findByIdAndUpdate(userId, { currentFamilyId: family._id });
 
+    const populatedFamily = await Family.findById(family._id).populate('members.userId', 'name email');
+
     res.status(201).json({
       message: 'Family created successfully',
-      family: await Family.findById(family._id).populate('members.userId', 'name email')
+      family: populatedFamily,
+      joinCode: family.joinCode
     });
   } catch (err) {
-    console.error('Create family error:', err);
-    res.status(500).json({ message: 'Failed to create family' });
+    console.error('❌ Create family error:', err.message);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ message: 'Failed to create family: ' + err.message });
   }
 });
 
-// Invite a member to family
-router.post('/:familyId/invite', protect, async (req, res) => {
+// Join a family using code
+router.post('/join-by-code', protect, async (req, res) => {
   try {
-    const { familyId } = req.params;
-    const { email, role = 'member' } = req.body;
+    const { joinCode } = req.body;
     const userId = req.user._id;
 
-    const family = await Family.findById(familyId);
-    if (!family) {
-      return res.status(404).json({ message: 'Family not found' });
+    if (!joinCode ||joinCode.trim().length === 0) {
+      return res.status(400).json({ message: 'Family code is required' });
     }
 
-    // Check if user has permission to invite
-    if (!family.isAdmin(userId) && !family.settings.allowMembersToInvite) {
-      return res.status(403).json({ message: 'Not authorized to invite members' });
-    }
-
-    // Check if email is already a member
-    const invitedUser = await User.findOne({ email: email.toLowerCase() });
-    if (invitedUser && family.isMember(invitedUser._id)) {
-      return res.status(400).json({ message: 'User is already a member of this family' });
-    }
-
-    // Check if there's already a pending invitation
-    const existingInvitation = family.invitations.find(
-      inv => inv.email === email.toLowerCase() && inv.status === 'pending'
-    );
-    if (existingInvitation) {
-      return res.status(400).json({ message: 'Invitation already sent to this email' });
-    }
-
-    // Create invitation
-    const token = generateToken();
-    family.invitations.push({
-      email: email.toLowerCase(),
-      invitedBy: userId,
-      token,
-      role,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    });
-
-    await family.save();
-
-    res.json({
-      message: 'Invitation sent successfully',
-      invitation: {
-        email: email.toLowerCase(),
-        role,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      }
-    });
-  } catch (err) {
-    console.error('Invite member error:', err);
-    res.status(500).json({ message: 'Failed to send invitation' });
-  }
-});
-
-// Accept invitation
-router.post('/accept-invitation/:token', protect, async (req, res) => {
-  try {
-    const { token } = req.params;
-    const userId = req.user._id;
-    const userEmail = req.user.email.toLowerCase();
-
-    const family = await Family.findOne({
-      'invitations.token': token,
-      'invitations.email': userEmail,
-      'invitations.status': 'pending'
-    });
+    console.log(`🔗 Attempting to join family with code: ${joinCode.toUpperCase()}`);
+    
+    // Find family by code - case insensitive
+    const family = await Family.findByJoinCode(joinCode.toUpperCase());
 
     if (!family) {
-      return res.status(404).json({ message: 'Invitation not found or expired' });
+      console.log(`❌ Family code not found: ${joinCode}`);
+      return res.status(404).json({ message: 'Family code not found. Please check and try again.' });
     }
 
-    const invitation = family.invitations.find(
-      inv => inv.token === token && inv.email.toLowerCase() === userEmail
-    );
+    console.log(`✅ Found family: ${family.name}`);
 
-    // Check if invitation expired
-    if (new Date() > invitation.expiresAt) {
-      invitation.status = 'expired';
-      await family.save();
-      return res.status(400).json({ message: 'Invitation has expired' });
-    }
-
-    // Check if already a member
+    // Check if user is already a member
     if (family.isMember(userId)) {
       return res.status(400).json({ message: 'You are already a member of this family' });
     }
 
-    // Add user to family
+    // Add user to family as member
     family.members.push({
       userId,
-      role: invitation.role,
+      role: 'member',
       joinedAt: new Date()
     });
 
-    // Update invitation status
-    invitation.status = 'accepted';
-
     await family.save();
+    console.log(`✅ User added to family: ${family.name}`);
 
     // Update user's current family
     await User.findByIdAndUpdate(userId, { currentFamilyId: family._id });
 
+    const populatedFamily = await Family.findById(family._id).populate('members.userId', 'name email');
+
     res.json({
-      message: 'Successfully joined family',
-      family: await Family.findById(family._id).populate('members.userId', 'name email')
+      message: 'Successfully joined family!',
+      family: populatedFamily,
+      familyName: family.name
     });
   } catch (err) {
-    console.error('Accept invitation error:', err);
-    res.status(500).json({ message: 'Failed to accept invitation' });
+    console.error('❌ Join family error:', err);
+    res.status(500).json({ message: 'Failed to join family' });
   }
 });
 
-// Reject invitation
-router.post('/reject-invitation/:token', protect, async (req, res) => {
-  try {
-    const { token } = req.params;
-    const userEmail = req.user.email.toLowerCase();
-
-    const family = await Family.findOne({
-      'invitations.token': token,
-      'invitations.email': userEmail,
-      'invitations.status': 'pending'
-    });
-
-    if (!family) {
-      return res.status(404).json({ message: 'Invitation not found' });
-    }
-
-    const invitation = family.invitations.find(inv => inv.token === token);
-    invitation.status = 'rejected';
-    await family.save();
-
-    res.json({ message: 'Invitation rejected' });
-  } catch (err) {
-    console.error('Reject invitation error:', err);
-    res.status(500).json({ message: 'Failed to reject invitation' });
-  }
-});
-
-// Switch current family
+// Switch current family (BEFORE wildcard /:familyId routes)
 router.post('/switch/:familyId', protect, async (req, res) => {
   try {
     const { familyId } = req.params;
     const userId = req.user._id;
 
-    // Validate family exists and user is a member
+    console.log(`🔄 Switching to family: ${familyId}`);
+
     const family = await Family.findById(familyId);
+
     if (!family) {
+      console.log(`❌ Family not found: ${familyId}`);
       return res.status(404).json({ message: 'Family not found' });
     }
 
+    // Check if user is a member
     if (!family.isMember(userId)) {
-      return res.status(403).json({ message: 'You are not a member of this family' });
+      console.log(`❌ User ${userId} not a member of family ${familyId}`);
+      return res.status(403).json({ message: 'Not authorized to switch to this family' });
     }
 
     // Update user's current family
     await User.findByIdAndUpdate(userId, { currentFamilyId: familyId });
+    console.log(`✅ Switched to family: ${family.name}`);
 
     res.json({
-      message: 'Family switched successfully',
-      currentFamilyId: familyId
+      message: 'Switched to family successfully',
+      familyId: family._id,
+      familyName: family.name
     });
   } catch (err) {
-    console.error('Switch family error:', err);
+    console.error('❌ Switch family error:', err);
     res.status(500).json({ message: 'Failed to switch family' });
   }
 });
 
-// Leave family
+// Get family join code (owner/admin only)
+router.get('/:familyId/join-code', protect, async (req, res) => {
+  try {
+    const { familyId } = req.params;
+    const userId = req.user._id;
+
+    console.log(`📋 Fetching join code for family: ${familyId}`);
+
+    const family = await Family.findById(familyId);
+
+    if (!family) {
+      console.log(`❌ Family not found: ${familyId}`);
+      return res.status(404).json({ message: 'Family not found' });
+    }
+
+    // Check if user is owner/admin
+    if (!family.isAdmin(userId)) {
+      console.log(`❌ User ${userId} is not admin of family ${familyId}`);
+      return res.status(403).json({ message: 'Only family admin can view join code' });
+    }
+
+    if (!family.joinCode) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const timestamp = Date.now().toString(36).toUpperCase();
+      let code = timestamp.slice(-4);
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      family.joinCode = code.substring(0, 8);
+      await family.save();
+      console.log(`✅ Generated missing join code for family: ${family.name}`);
+    }
+
+    console.log(`✅ Returning join code for family: ${family.name} - ${family.joinCode}`);
+    res.json({
+      familyId: family._id,
+      familyName: family.name,
+      joinCode: family.joinCode,
+      memberCount: family.members.length
+    });
+  } catch (err) {
+    console.error('❌ Get join code error:', err);
+    res.status(500).json({ message: 'Failed to get join code' });
+  }
+});
+
+// Leave a family
 router.post('/:familyId/leave', protect, async (req, res) => {
   try {
     const { familyId } = req.params;
     const userId = req.user._id;
 
     const family = await Family.findById(familyId);
+
     if (!family) {
       return res.status(404).json({ message: 'Family not found' });
     }
 
-    // Check if user is the owner
-    const member = family.members.find(m => m.userId.toString() === userId.toString());
-    if (member && member.role === 'owner') {
-      return res.status(400).json({ message: 'Owner cannot leave the family. Transfer ownership first or delete the family.' });
+    // Check if user is a member
+    if (!family.isMember(userId)) {
+      return res.status(400).json({ message: 'Not a member of this family' });
+    }
+
+    // Check if user is the only owner
+    const owners = family.members.filter(m => m.role === 'owner');
+    if (owners.length === 1 && family.getMemberRole(userId) === 'owner') {
+      return res.status(400).json({ message: 'Cannot leave family as the only owner. Delete the family or assign ownership to another member.' });
     }
 
     // Remove user from family
     family.members = family.members.filter(m => m.userId.toString() !== userId.toString());
     await family.save();
 
-    // Clear user's current family if it was this one
+    // If user was in this family, update current family
     const user = await User.findById(userId);
-    if (user.currentFamilyId && user.currentFamilyId.toString() === familyId) {
-      await User.findByIdAndUpdate(userId, { currentFamilyId: null });
+    if (user.currentFamilyId?.toString() === familyId) {
+      const newFamily = await Family.findByMember(userId);
+      await User.findByIdAndUpdate(userId, {
+        currentFamilyId: newFamily.length > 0 ? newFamily[0]._id : null
+      });
     }
 
     res.json({ message: 'Successfully left family' });
@@ -296,18 +258,19 @@ router.post('/:familyId/leave', protect, async (req, res) => {
   }
 });
 
-// Remove member from family (admin only)
+// Remove a member (admin only)
 router.post('/:familyId/remove-member/:memberId', protect, async (req, res) => {
   try {
     const { familyId, memberId } = req.params;
     const userId = req.user._id;
 
     const family = await Family.findById(familyId);
+
     if (!family) {
       return res.status(404).json({ message: 'Family not found' });
     }
 
-    // Check if user is admin/owner
+    // Check if user has permission to remove members
     if (!family.isAdmin(userId)) {
       return res.status(403).json({ message: 'Not authorized to remove members' });
     }
@@ -315,15 +278,21 @@ router.post('/:familyId/remove-member/:memberId', protect, async (req, res) => {
     // Cannot remove owner
     const memberToRemove = family.members.find(m => m.userId.toString() === memberId);
     if (memberToRemove && memberToRemove.role === 'owner') {
-      return res.status(400).json({ message: 'Cannot remove the owner' });
+      return res.status(400).json({ message: 'Cannot remove family owner' });
     }
 
     // Remove member
     family.members = family.members.filter(m => m.userId.toString() !== memberId);
     await family.save();
 
-    // Clear removed user's current family
-    await User.findByIdAndUpdate(memberId, { currentFamilyId: null });
+    // If removed user was viewing this family, update their current family
+    const user = await User.findById(memberId);
+    if (user && user.currentFamilyId?.toString() === familyId) {
+      const newFamily = await Family.findByMember(memberId);
+      await User.findByIdAndUpdate(memberId, {
+        currentFamilyId: newFamily.length > 0 ? newFamily[0]._id : null
+      });
+    }
 
     res.json({ message: 'Member removed successfully' });
   } catch (err) {
@@ -332,93 +301,39 @@ router.post('/:familyId/remove-member/:memberId', protect, async (req, res) => {
   }
 });
 
-// Update family settings (admin only)
-router.put('/:familyId/settings', protect, async (req, res) => {
-  try {
-    const { familyId } = req.params;
-    const { allowMembersToInvite, allowMembersToDelete, name, description } = req.body;
-    const userId = req.user._id;
-
-    const family = await Family.findById(familyId);
-    if (!family) {
-      return res.status(404).json({ message: 'Family not found' });
-    }
-
-    // Check if user is admin/owner
-    if (!family.isAdmin(userId)) {
-      return res.status(403).json({ message: 'Not authorized to update settings' });
-    }
-
-    // Update fields
-    if (name) family.name = name.trim();
-    if (description !== undefined) family.description = description.trim();
-    if (allowMembersToInvite !== undefined) family.settings.allowMembersToInvite = allowMembersToInvite;
-    if (allowMembersToDelete !== undefined) family.settings.allowMembersToDelete = allowMembersToDelete;
-
-    await family.save();
-
-    res.json({
-      message: 'Settings updated successfully',
-      family: await Family.findById(familyId).populate('members.userId', 'name email')
-    });
-  } catch (err) {
-    console.error('Update settings error:', err);
-    res.status(500).json({ message: 'Failed to update settings' });
-  }
-});
-
-// Get family pantry items (shared items)
-router.get('/:familyId/pantry', protect, async (req, res) => {
+// Delete family (owner only)
+router.delete('/:familyId', protect, async (req, res) => {
   try {
     const { familyId } = req.params;
     const userId = req.user._id;
 
     const family = await Family.findById(familyId);
-    if (!family) {
-      return res.status(404).json({ message: 'Family not found' });
-    }
-
-    // Check if user is a member
-    if (!family.isMember(userId)) {
-      return res.status(403).json({ message: 'Not authorized to view family pantry' });
-    }
-
-    // Get family pantry items
-    const items = await PantryItem.find({ familyId })
-      .populate('addedBy', 'name')
-      .populate('lastModifiedBy', 'name')
-      .sort({ expiryDate: 1 });
-
-    res.json(items);
-  } catch (err) {
-    console.error('Get family pantry error:', err);
-    res.status(500).json({ message: 'Failed to load family pantry' });
-  }
-});
-
-// Get family details
-router.get('/:familyId', protect, async (req, res) => {
-  try {
-    const { familyId } = req.params;
-    const userId = req.user._id;
-
-    const family = await Family.findById(familyId)
-      .populate('members.userId', 'name email')
-      .populate('invitations.invitedBy', 'name');
 
     if (!family) {
       return res.status(404).json({ message: 'Family not found' });
     }
 
-    // Check if user is a member
-    if (!family.isMember(userId)) {
-      return res.status(403).json({ message: 'Not authorized to view this family' });
+    // Check if user is owner
+    if (!family.isAdmin(userId) || family.getMemberRole(userId) !== 'owner') {
+      return res.status(403).json({ message: 'Only family owner can delete family' });
     }
 
-    res.json(family);
+    // Delete family
+    await Family.findByIdAndDelete(familyId);
+
+    // Update all members' current family
+    const memberIds = family.members.map(m => m.userId);
+    for (const memberId of memberIds) {
+      const newFamily = await Family.findByMember(memberId);
+      await User.findByIdAndUpdate(memberId, {
+        currentFamilyId: newFamily.length > 0 ? newFamily[0]._id : null
+      });
+    }
+
+    res.json({ message: 'Family deleted successfully' });
   } catch (err) {
-    console.error('Get family error:', err);
-    res.status(500).json({ message: 'Failed to load family details' });
+    console.error('Delete family error:', err);
+    res.status(500).json({ message: 'Failed to delete family' });
   }
 });
 

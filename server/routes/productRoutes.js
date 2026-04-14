@@ -101,15 +101,27 @@ router.get('/', authMiddleware, async (req, res) => {
 
 // ---------- GET EXPIRY SUMMARY ----------
 
-router.get('/summary', async (req, res) => {
+router.get('/summary', authMiddleware, async (req, res) => {
     try {
-        const totalItems = await PantryItem.countDocuments();
-        const expiredItems = await PantryItem.countDocuments({ status: 'expired' });
-        const expiringSoon = await PantryItem.countDocuments({
-            status: 'expiring',
-        });
+        // Get user's current family
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
+        // Build query - personal items + family items if applicable
+        let query = {
+            $or: [{ userId: req.userId }]
+        };
+
+        if (currentFamilyId) {
+            query.$or.push({ familyId: currentFamilyId });
+        }
+
+        const totalItems = await PantryItem.countDocuments(query);
+        const expiredItems = await PantryItem.countDocuments({ ...query, status: 'expired' });
+        const expiringSoon = await PantryItem.countDocuments({ ...query, status: 'expiring' });
 
         const categoryDistribution = await PantryItem.aggregate([
+            { $match: query },
             { $group: { _id: '$category', count: { $sum: 1 } } },
         ]);
 
@@ -197,12 +209,24 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // ---------- BATCH OPERATIONS ----------
 
-router.delete('/batch', async (req, res) => {
+    router.delete('/batch', authMiddleware, async (req, res) => {
     try {
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({ message: 'Invalid or empty IDs array' });
         }
+
+        // Verify all items belong to user or their family before deletion
+        const products = await PantryItem.find({ _id: { $in: ids } });
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        
+        for (const product of products) {
+            const canDelete = await checkDeletePermission(product, req.userId);
+            if (!canDelete) {
+                return res.status(403).json({ message: 'Not authorized to delete this product' });
+            }
+        }
+
         const result = await PantryItem.deleteMany({ _id: { $in: ids } });
         res.json({ message: `${result.deletedCount} items deleted successfully` });
     } catch (err) {
@@ -210,15 +234,27 @@ router.delete('/batch', async (req, res) => {
     }
 });
 
-router.put('/batch/status', async (req, res) => {
+router.put('/batch/status', authMiddleware, async (req, res) => {
     try {
         const { ids, status } = req.body;
         if (!Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({ message: 'Invalid or empty IDs array' });
         }
+
+        // Verify all items belong to user or their family before updating
+        const products = await PantryItem.find({ _id: { $in: ids } });
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        
+        for (const product of products) {
+            const canEdit = await checkEditPermission(product, req.userId);
+            if (!canEdit) {
+                return res.status(403).json({ message: 'Not authorized to edit this product' });
+            }
+        }
+
         const result = await PantryItem.updateMany(
             { _id: { $in: ids } },
-            { $set: { status } }
+            { $set: { status, lastModifiedBy: req.userId } }
         );
         res.json({ message: `${result.modifiedCount} items updated successfully` });
     } catch (err) {
