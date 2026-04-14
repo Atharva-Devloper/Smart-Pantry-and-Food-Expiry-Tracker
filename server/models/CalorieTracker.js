@@ -91,7 +91,7 @@ const calorieTrackerSchema = new mongoose.Schema(
                 },
                 estimateSource: {
                     type: String,
-                    enum: ['groq', 'groq-corrected', 'fallback', 'none'],
+                    enum: ['groq', 'fallback', 'none'],
                     default: 'fallback',
                 },
             }],

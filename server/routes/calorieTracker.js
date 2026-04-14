@@ -12,15 +12,11 @@ const roundTo2 = (value) => Math.round(value * 100) / 100;
 const getCalorieNotification = ({ estimateSource, calories, quantity, unit, name }) => {
     const qtyText = roundTo2(quantity);
     const map = {
-        groq: `Groq estimate confirmed: ${calories} kcal for ${qtyText} ${unit} of ${name}.`,
-        'groq-corrected': `Groq response looked unreliable, corrected estimate used: ${calories} kcal for ${qtyText} ${unit} of ${name}.`,
-        fallback: `Fallback estimate used: ${calories} kcal for ${qtyText} ${unit} of ${name}.`,
-        none: `No calories estimated for ${qtyText} ${unit} of ${name}.`,
+        groq: `Estimated: ${calories} kcal for ${qtyText} ${unit} of ${name}.`,
+        fallback: `Estimated (fallback): ${calories} kcal for ${qtyText} ${unit} of ${name}.`,
+        none: `No estimate for ${qtyText} ${unit} of ${name}.`,
     };
-    return (
-        map[estimateSource] ||
-        `Calorie estimate (${estimateSource}): ${calories} kcal for ${qtyText} ${unit} of ${name}.`
-    );
+    return map[estimateSource] || `Estimate: ${calories} kcal for ${qtyText} ${unit} of ${name}.`;
 };
 
 const applyMealConsumption = async ({ userId, date, mealType, items }) => {
