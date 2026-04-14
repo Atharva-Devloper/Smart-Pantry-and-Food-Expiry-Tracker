@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import '../styles/HomePage.css';
 
 const HomePage = () => {
+    const { user } = useAuth();
+
     return (
         <div className="home-page">
             <div className="hero-section">
@@ -12,12 +15,25 @@ const HomePage = () => {
                         Never waste food again! Track your pantry items, monitor expiry dates, and manage your kitchen inventory efficiently.
                     </p>
                     <div className="hero-buttons">
-                        <Link to="/products" className="btn btn-primary">
-                            View Products
-                        </Link>
-                        <Link to="/products" className="btn btn-secondary">
-                            Add New Item
-                        </Link>
+                        {user ? (
+                            <>
+                                <Link to="/products" className="btn btn-primary">
+                                    View Inventory
+                                </Link>
+                                <Link to="/" className="btn btn-secondary">
+                                    Dashboard
+                                </Link>
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/register" className="btn btn-primary">
+                                    Get Started
+                                </Link>
+                                <Link to="/login" className="btn btn-secondary">
+                                    Sign In
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="hero-image">
@@ -41,14 +57,24 @@ const HomePage = () => {
                         <p>Keep track of what you have and what you need to buy</p>
                     </div>
                     <div className="feature-card">
+                        <div className="feature-icon">🛒</div>
+                        <h3>Shopping List</h3>
+                        <p>Plan purchases and manage your shopping lists easily</p>
+                    </div>
+                    <div className="feature-card">
+                        <div className="feature-icon">👨‍👩‍👧‍👦</div>
+                        <h3>Family Sharing</h3>
+                        <p>Share pantry access with family members and collaborate</p>
+                    </div>
+                    <div className="feature-card">
+                        <div className="feature-icon">📈</div>
+                        <h3>Waste Tracking</h3>
+                        <p>Monitor food waste patterns and reduce expenses</p>
+                    </div>
+                    <div className="feature-card">
                         <div className="feature-icon">🔄</div>
                         <h3>Real-time Updates</h3>
                         <p>Instant updates when you add, edit, or remove items</p>
-                    </div>
-                    <div className="feature-card">
-                        <div className="feature-icon">📱</div>
-                        <h3>Mobile Friendly</h3>
-                        <p>Access your pantry from anywhere, on any device</p>
                     </div>
                 </div>
             </div>
@@ -56,16 +82,16 @@ const HomePage = () => {
             <div className="stats-section">
                 <div className="stats-container">
                     <div className="stat-item">
-                        <div className="stat-number">0</div>
-                        <div className="stat-label">Total Items</div>
+                        <div className="stat-number">1000+</div>
+                        <div className="stat-label">Active Users</div>
                     </div>
                     <div className="stat-item">
-                        <div className="stat-number">0</div>
-                        <div className="stat-label">Expiring Soon</div>
+                        <div className="stat-number">50K+</div>
+                        <div className="stat-label">Items Tracked</div>
                     </div>
                     <div className="stat-item">
-                        <div className="stat-number">0</div>
-                        <div className="stat-label">Categories</div>
+                        <div className="stat-number">25%</div>
+                        <div className="stat-label">Waste Reduction</div>
                     </div>
                 </div>
             </div>
@@ -73,9 +99,11 @@ const HomePage = () => {
             <div className="cta-section">
                 <h2>Ready to Organize Your Pantry?</h2>
                 <p>Start tracking your food items today and reduce waste significantly.</p>
-                <Link to="/products" className="btn btn-primary btn-large">
-                    Get Started Now
-                </Link>
+                {!user && (
+                    <Link to="/register" className="btn btn-primary btn-large">
+                        Get Started Now
+                    </Link>
+                )}
             </div>
         </div>
     );

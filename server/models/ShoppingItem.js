@@ -30,6 +30,11 @@ const shoppingItemSchema = new mongoose.Schema(
             ref: 'User',
             required: true,
         },
+        familyId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Family',
+            default: null,
+        },
         priority: {
             type: String,
             enum: ['low', 'medium', 'high'],

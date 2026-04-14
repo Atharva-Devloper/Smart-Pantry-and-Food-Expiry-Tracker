@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, ChefHat, Trash2, Users, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, ChefHat, Trash2, Users, LogOut, User, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Navbar.css';
 
@@ -27,13 +27,18 @@ const Navbar = () => {
                 {user ? (
                     <>
                         <li>
-                            <Link to="/dashboard" className={isActive('/dashboard')}>
+                            <Link to="/" className={isActive('/')}>
                                 <LayoutDashboard size={18} /> Dashboard
                             </Link>
                         </li>
                         <li>
                             <Link to="/products" className={isActive('/products')}>
                                 <Package size={18} /> Inventory
+                            </Link>
+                        </li>
+                        <li>
+                            <Link to="/add-product" className={isActive('/add-product')}>
+                                <Plus size={18} /> Add Product
                             </Link>
                         </li>
                         <li>

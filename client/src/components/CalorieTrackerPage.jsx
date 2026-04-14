@@ -284,8 +284,8 @@ const CalorieTrackerPage = () => {
     return (
         <div className="calorie-tracker">
             <div className="tracker-header">
-                <h1>Calorie Tracker (Inventory-Driven)</h1>
-                <div className="date-selector">
+                <h1>🔥 Calorie Tracker</h1>
+                <div className="tracker-header-controls">
                     <input
                         type="date"
                         value={selectedDate}
@@ -295,39 +295,40 @@ const CalorieTrackerPage = () => {
                 </div>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
-            {success && <div className="success-message">{success}</div>}
+            <div className="tracker-main">
+                {error && <div className="error">{error}</div>}
+                {success && <div className="success">{success}</div>}
 
-            <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
-                <div className="stat-card">
-                    <h3>Total Calories ({selectedDate})</h3>
-                    <div className="stat-value">{dailyTotal}</div>
-                </div>
-                <div className="stat-card">
-                    <h3>Inventory Items Available</h3>
-                    <div className="stat-value">{pantryItems.length}</div>
-                </div>
-                <div className="stat-card">
-                    <h3>{historyViewMode === 'weekly' ? 'Cumulative Weekly' : 'Cumulative Daily'}</h3>
-                    <div className="stat-value">{totalWindowCalories}</div>
-                </div>
-            </div>
-
-            <div className="meals-section" style={{ marginBottom: '1.5rem' }}>
-                <div className="meals-header">
-                    <h2>Build Meal From Inventory</h2>
+                <div className="stats-cards" style={{ marginBottom: '1.5rem' }}>
+                    <div className="stat-card">
+                        <h3>Total Calories ({selectedDate})</h3>
+                        <div className="stat-value">{dailyTotal}</div>
+                    </div>
+                    <div className="stat-card">
+                        <h3>Inventory Items Available</h3>
+                        <div className="stat-value">{pantryItems.length}</div>
+                    </div>
+                    <div className="stat-card">
+                        <h3>{historyViewMode === 'weekly' ? 'Cumulative Weekly' : 'Cumulative Daily'}</h3>
+                        <div className="stat-value">{totalWindowCalories}</div>
+                    </div>
                 </div>
 
-                <form onSubmit={logMealConsumption}>
-                    <div
-                        className="food-item-input"
-                        style={{ gridTemplateColumns: '1fr 1.5fr 1fr auto' }}
-                    >
-                        <select
-                            className="food-unit-select"
-                            value={formData.mealType}
-                            onChange={(e) =>
-                                setFormData((prev) => ({ ...prev, mealType: e.target.value }))
+                <div className="meals-section" style={{ marginBottom: '1.5rem' }}>
+                    <div className="meals-header">
+                        <h2>Build Meal From Inventory</h2>
+                    </div>
+
+                    <form onSubmit={logMealConsumption}>
+                        <div
+                            className="food-item-input"
+                            style={{ gridTemplateColumns: '1fr 1.5fr 1fr auto' }}
+                        >
+                            <select
+                                className="food-unit-select"
+                                value={formData.mealType}
+                                onChange={(e) =>
+                                    setFormData((prev) => ({ ...prev, mealType: e.target.value }))
                             }
                         >
                             <option value="breakfast">Breakfast</option>
@@ -530,6 +531,7 @@ const CalorieTrackerPage = () => {
                     </div>
                 )}
             </div>
+        </div>
         </div>
     );
 };

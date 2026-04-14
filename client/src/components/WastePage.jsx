@@ -150,54 +150,57 @@ const WastePage = () => {
     }
 
     return (
-        <div className="waste-container">
-            <h1>📊 Waste Tracking Analytics</h1>
-
-            {error && <div className="error-msg">{error}</div>}
-
-            {/* Period Selector */}
-            <div className="period-selector">
-                <button
-                    className={`period-btn ${period === 1 ? 'active' : ''}`}
-                    onClick={() => setPeriod(1)}
-                >
-                    📅 Day
-                </button>
-                <button
-                    className={`period-btn ${period === 7 ? 'active' : ''}`}
-                    onClick={() => setPeriod(7)}
-                >
-                    📆 Week
-                </button>
-                <button
-                    className={`period-btn ${period === 30 ? 'active' : ''}`}
-                    onClick={() => setPeriod(30)}
-                >
-                    📋 Month
-                </button>
+        <div className="waste-page">
+            <div className="waste-header">
+                <h1>🗑️ Waste Tracking</h1>
             </div>
 
-            {/* Summary Cards */}
-            <div className="stats-cards">
-                <div className="stat-card">
-                    <h3>Total Items Wasted</h3>
-                    <p className="stat-value">{getTotalWastedCount()}</p>
-                    <span className="stat-period">{getPeriodLabel()}</span>
-                </div>
-                <div className="stat-card">
-                    <h3>Total Quantity Wasted</h3>
-                    <p className="stat-value">${totalEstimatedValue.toFixed(2)}</p>
-                    <span className="stat-period">Estimated Value</span>
-                </div>
-            </div>
+            <div className="waste-container">
+                {error && <div className="error-msg">{error}</div>}
 
-            {loading ? (
-                <div className="loading">Loading waste analytics...</div>
-            ) : (
-                <>
-                    {/* Daily Waste Trend */}
-                    <div className="chart-section">
-                        <h2>📈 Daily Waste Trend</h2>
+                {/* Period Selector */}
+                <div className="period-selector">
+                    <button
+                        className={`period-btn ${period === 1 ? 'active' : ''}`}
+                        onClick={() => setPeriod(1)}
+                    >
+                        📅 Day
+                    </button>
+                    <button
+                        className={`period-btn ${period === 7 ? 'active' : ''}`}
+                        onClick={() => setPeriod(7)}
+                    >
+                        📆 Week
+                    </button>
+                    <button
+                        className={`period-btn ${period === 30 ? 'active' : ''}`}
+                        onClick={() => setPeriod(30)}
+                    >
+                        📋 Month
+                    </button>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="stats-cards">
+                    <div className="stat-card">
+                        <h3>Total Items Wasted</h3>
+                        <p className="stat-value">{getTotalWastedCount()}</p>
+                        <span className="stat-period">{getPeriodLabel()}</span>
+                    </div>
+                    <div className="stat-card">
+                        <h3>Total Quantity Wasted</h3>
+                        <p className="stat-value">${totalEstimatedValue.toFixed(2)}</p>
+                        <span className="stat-period">Estimated Value</span>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="loading">Loading waste analytics...</div>
+                ) : (
+                    <>
+                        {/* Daily Waste Trend */}
+                        <div className="chart-section">
+                            <h2>📈 Daily Waste Trend</h2>
                         <div className="chart-container">
                             <ResponsiveContainer width="100%" height={300}>
                                 <LineChart data={trendChartData}>
@@ -378,6 +381,7 @@ const WastePage = () => {
                     </div>
                 </>
             )}
+            </div>
         </div>
     );
 };

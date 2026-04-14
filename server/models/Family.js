@@ -17,37 +17,6 @@ const familyMemberSchema = new mongoose.Schema({
   }
 }, { _id: true });
 
-const invitationSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: true
-  },
-  invitedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  token: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  role: {
-    type: String,
-    enum: ['admin', 'member'],
-    default: 'member'
-  },
-  expiresAt: {
-    type: Date,
-    default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'accepted', 'rejected'],
-    default: 'pending'
-  }
-}, { _id: true });
-
 const familySchema = new mongoose.Schema({
   name: {
     type: String,
@@ -59,11 +28,17 @@ const familySchema = new mongoose.Schema({
     trim: true
   },
   members: [familyMemberSchema],
-  invitations: [invitationSchema],
+  joinCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    minlength: 6,
+    maxlength: 12
+  },
   settings: {
     allowMembersToInvite: {
       type: Boolean,
-      default: false
+      default: true
     },
     allowMembersToDelete: {
       type: Boolean,
@@ -96,10 +71,24 @@ familySchema.statics.findByMember = function(userId) {
   return this.find({ 'members.userId': userId });
 };
 
-// Static method to find family by invitation token
-familySchema.statics.findByInvitationToken = function(token) {
-  return this.findOne({ 'invitations.token': token, 'invitations.status': 'pending' });
+// Static method to find family by join code
+familySchema.statics.findByJoinCode = function(code) {
+  return this.findOne({ joinCode: code.toUpperCase() });
 };
+
+// Generate a unique join code with timestamp and randomness
+function generateJoinCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const timestamp = Date.now().toString(36).toUpperCase();
+  let code = timestamp.slice(-4); // Take last 4 chars of timestamp
+  
+  // Add 4 random characters for uniqueness
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  return code.substring(0, 8);
+}
 
 const Family = mongoose.model('Family', familySchema);
 

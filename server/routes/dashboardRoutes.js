@@ -10,10 +10,19 @@ router.get('/', protect, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const currentFamilyId = req.user.currentFamilyId;
 
-    // Base stats - personal items
-    const userProducts = await PantryItem.find({ userId });
+    // Build query for personal + family items
+    let query = {
+      $or: [{ userId }]
+    };
+    
+    if (currentFamilyId) {
+      query.$or.push({ familyId: currentFamilyId });
+    }
+
+    // Base stats - personal + family items
+    const userProducts = await PantryItem.find(query);
     const userWasteLogs = await WasteLog.countDocuments({ userId });
-    const userShoppingItems = await ShoppingItem.countDocuments({ userId });
+    const userShoppingItems = await ShoppingItem.countDocuments({ userId, familyId: currentFamilyId || null });
 
     // Expiry breakdown
     const today = new Date();
@@ -58,15 +67,15 @@ router.get('/', protect, async (req, res) => {
       };
     }
 
-    // Recent items
-    const recentItems = await PantryItem.find({ userId })
+    // Recent items (personal + family)
+    const recentItems = await PantryItem.find(query)
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('addedBy', 'name');
 
-    // Category breakdown
+    // Category breakdown (personal + family)
     const categoryBreakdown = await PantryItem.aggregate([
-      { $match: { userId } },
+      { $match: query },
       { $group: { _id: '$category', count: { $sum: 1 } } }
     ]);
 

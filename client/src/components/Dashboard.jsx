@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, Users, AlertCircle, 
-  ShoppingCart, TrendingUp, Calendar, Clock
+  ShoppingCart, TrendingUp, Calendar, Clock, Plus
 } from 'lucide-react';
 import API_BASE_URL from '../config';
 import '../styles/Dashboard.css';
@@ -66,11 +67,14 @@ const Dashboard = () => {
           <LayoutDashboard size={32} />
           <h1>Dashboard</h1>
           <p>Welcome back, {user?.name?.split(' ')[0]}!</p>
+          <Link to="/add-product" className="btn-add-product">
+            <Plus size={20} /> Add Product
+          </Link>
         </div>
 
         {/* Stats Grid */}
         <div className="stats-grid">
-          <div className="stat-card">
+          <Link to="/products" className="stat-card">
             <div className="stat-icon">
               <Package size={24} />
             </div>
@@ -78,7 +82,7 @@ const Dashboard = () => {
               <h3>{data?.stats?.totalProducts || 0}</h3>
               <p>Total Products</p>
             </div>
-          </div>
+          </Link>
 
           <div className="stat-card warning">
             <div className="stat-icon">
@@ -100,7 +104,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="stat-card success">
+          <Link to="/shopping" className="stat-card success">
             <div className="stat-icon">
               <ShoppingCart size={24} />
             </div>
@@ -108,7 +112,7 @@ const Dashboard = () => {
               <h3>{data?.stats?.totalShoppingItems || 0}</h3>
               <p>Shopping Items</p>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Family Section */}
