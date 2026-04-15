@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Users, Plus, UserPlus, Trash2, LogOut, 
+import {
+  Users, Plus, UserPlus, Trash2, LogOut,
   Check, X, Home, Crown, Shield,
   AlertCircle, Loader2, Copy, Share2
 } from 'lucide-react';
@@ -15,7 +15,7 @@ const Family = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -23,7 +23,7 @@ const Family = () => {
   const [selectedFamily, setSelectedFamily] = useState(null);
   const [familyJoinCode, setFamilyJoinCode] = useState('');
   const [codeLoading, setCodeLoading] = useState(false);
-  
+
   // Form states
   const [newFamilyName, setNewFamilyName] = useState('');
   const [newFamilyDescription, setNewFamilyDescription] = useState('');
@@ -122,7 +122,7 @@ const Family = () => {
       setCodeLoading(true);
       setFamilyJoinCode('');
       setShowCodeModal(true);
-      
+
       // Fetch the join code from the API
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/family/${family._id}/join-code`, {
@@ -174,7 +174,7 @@ const Family = () => {
 
   const leaveFamily = async (familyId) => {
     if (!confirm('Are you sure you want to leave this family?')) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/family/${familyId}/leave`, {
@@ -196,7 +196,7 @@ const Family = () => {
 
   const removeMember = async (familyId, memberId) => {
     if (!confirm('Are you sure you want to remove this member?')) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/family/${familyId}/remove-member/${memberId}`, {
@@ -213,6 +213,28 @@ const Family = () => {
       }
     } catch (err) {
       setError('Error removing member');
+    }
+  };
+
+  const deleteFamily = async (familyId, familyName) => {
+    if (!confirm(`Are you sure you want to delete the family "${familyName}"? This will remove all family data and cannot be undone.`)) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/family/${familyId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setSuccessMessage('Family deleted successfully');
+        fetchFamilies();
+      } else {
+        const error = await response.json();
+        setError(error.message || 'Failed to delete family');
+      }
+    } catch (err) {
+      setError('Error deleting family');
     }
   };
 
@@ -379,7 +401,15 @@ const Family = () => {
                           <Share2 size={16} /> Share Code
                         </button>
                       )}
-                      {myRole !== 'owner' && (
+                      {myRole === 'owner' ? (
+                        <button
+                          className="btn btn-icon danger"
+                          onClick={() => deleteFamily(family._id, family.name)}
+                          title="Delete family"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : (
                         <button
                           className="btn btn-icon danger"
                           onClick={() => leaveFamily(family._id)}
@@ -497,7 +527,7 @@ const Family = () => {
                   <div className="code-display">
                     <div className="code-box">
                       <span className="code-text">{familyJoinCode}</span>
-                      <button 
+                      <button
                         type="button"
                         className="btn-copy"
                         onClick={() => copyJoinCode()}
@@ -517,7 +547,7 @@ const Family = () => {
                 <p className="code-instruction">Recipients should enter this code in the "Join with Code" option.</p>
               </div>
               <div className="modal-actions">
-                <button 
+                <button
                   type="button"
                   className="btn btn-primary"
                   onClick={() => setShowCodeModal(false)}
