@@ -22,13 +22,19 @@ const ShoppingPage = () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/shopping`, {
                 headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
             });
-            const data = await response.json();
-            setItems(data);
+            if (response.ok) {
+                const data = await response.json();
+                setItems(data);
+            } else {
+                const errorData = await response.json();
+                setError('Failed to load shopping list: ' + errorData.message);
+            }
             setLoading(false);
         } catch (error) {
             console.error('Error fetching shopping list:', error);
-            setError('Failed to load shopping list');
+            setError('Failed to load shopping list: ' + error.message);
             setLoading(false);
         }
     };
@@ -55,10 +61,11 @@ const ShoppingPage = () => {
             const parsedQty = Number(newItem.quantity);
             const response = await fetch(`${API_BASE_URL}/api/shopping`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     ...newItem,
                     quantity: Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1,
@@ -71,7 +78,8 @@ const ShoppingPage = () => {
                 fetchItems();
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
-                setError('Failed to add item');
+                const errorData = await response.json();
+                setError('Failed to add item: ' + errorData.message);
             }
         } catch (error) {
             console.error('Error adding item:', error);
@@ -85,28 +93,46 @@ const ShoppingPage = () => {
                 `${API_BASE_URL}/api/shopping/${id}/purchase`,
                 {
                     method: 'PATCH',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ moveToPantry }),
                 }
             );
-            if (response.ok) fetchItems();
+            if (response.ok) {
+                fetchItems();
+                setSuccessMessage('✅ Item marked as purchased!');
+                setTimeout(() => setSuccessMessage(''), 3000);
+            } else {
+                const errorData = await response.json();
+                setError('Failed to update item: ' + errorData.message);
+            }
         } catch (error) {
             console.error('Error updating item:', error);
+            setError('Error updating item: ' + error.message);
         }
     };
 
     const deleteItem = async (id) => {
         try {
-            await fetch(`${API_BASE_URL}/api/shopping/${id}`, { 
+            const response = await fetch(`${API_BASE_URL}/api/shopping/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
             });
-            fetchItems();
+            if (response.ok) {
+                fetchItems();
+                setSuccessMessage('✅ Item removed from shopping list!');
+                setTimeout(() => setSuccessMessage(''), 3000);
+            } else {
+                const errorData = await response.json();
+                setError('Failed to delete item: ' + errorData.message);
+            }
         } catch (error) {
             console.error('Error deleting item:', error);
+            setError('Error deleting item: ' + error.message);
         }
     };
 
