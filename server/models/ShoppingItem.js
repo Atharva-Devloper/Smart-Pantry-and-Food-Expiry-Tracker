@@ -28,12 +28,12 @@ const shoppingItemSchema = new mongoose.Schema(
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: true,
+            required: false, // Made optional since family is now primary
         },
         familyId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Family',
-            default: null,
+            required: [true, 'Family ID is required'], // Now required for shared inventory
         },
         priority: {
             type: String,

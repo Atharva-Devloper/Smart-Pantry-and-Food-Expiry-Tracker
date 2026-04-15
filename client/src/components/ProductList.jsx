@@ -107,14 +107,17 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
             const parsedQty = Number(quantity);
             const response = await fetch(`${API_BASE_URL}/api/shopping`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                credentials: 'include',
                 body: JSON.stringify({
                     name: showAddToShoppingModal.name,
                     quantity:
                         Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1,
                     quantityUnit: quantityUnit || showAddToShoppingModal.quantityUnit || 'units',
                     priority: priority || 'medium',
-                    userId: user?._id,
                     category: showAddToShoppingModal.category,
                 }),
             });
@@ -126,11 +129,12 @@ const ProductList = ({ products, onProductUpdated, onProductDeleted }) => {
                 setShowAddToShoppingModal(null);
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
-                setError('Failed to add to shopping list');
+                const errorData = await response.json();
+                setError('Failed to add to shopping list: ' + errorData.message);
             }
         } catch (error) {
             console.error('Error adding to shopping list:', error);
-            setError('Error adding to shopping list');
+            setError('Error adding to shopping list: ' + error.message);
         }
     };
 

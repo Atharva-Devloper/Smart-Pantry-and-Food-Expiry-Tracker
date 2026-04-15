@@ -78,12 +78,12 @@ const pantryItemSchema = new mongoose.Schema(
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: [true, 'User ID is required'],
+            required: false, // Made optional since family is now primary
         },
         familyId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Family',
-            default: null,
+            required: [true, 'Family ID is required'], // Now required for shared inventory
         },
         addedBy: {
             type: mongoose.Schema.Types.ObjectId,
@@ -150,26 +150,19 @@ pantryItemSchema.pre('save', function () {
     }
 });
 
-// Indexes for better query performance
-pantryItemSchema.index({ userId: 1, expiryDate: 1 });
-pantryItemSchema.index({ userId: 1, status: 1 });
-pantryItemSchema.index({ userId: 1, category: 1 });
+// Indexes for better query performance - family-first approach
 pantryItemSchema.index({ familyId: 1, expiryDate: 1 });
 pantryItemSchema.index({ familyId: 1, status: 1 });
+pantryItemSchema.index({ familyId: 1, category: 1 });
+pantryItemSchema.index({ addedBy: 1, createdAt: -1 }); // Track who added items
 
-// Static method to find items accessible by a user (personal + family shared)
-pantryItemSchema.statics.findAccessibleByUser = async function (userId, familyId) {
-    const query = {
-        $or: [
-            { userId }, // Personal items
-        ]
-    };
-
-    if (familyId) {
-        query.$or.push({ familyId }); // Family shared items
+// Static method to find items for a family (shared inventory)
+pantryItemSchema.statics.findByFamily = async function (familyId) {
+    if (!familyId) {
+        throw new Error('Family ID is required');
     }
 
-    return this.find(query).sort({ expiryDate: 1 });
+    return this.find({ familyId }).sort({ expiryDate: 1 });
 };
 
 module.exports = mongoose.model('PantryItem', pantryItemSchema);

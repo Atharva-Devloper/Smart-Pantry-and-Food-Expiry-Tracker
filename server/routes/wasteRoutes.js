@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const WasteLog = require('../models/WasteLog');
 const PantryItem = require('../models/PantryItem');
+const { User } = require('../models');
 const authMiddleware = require('../middleware/auth');
 
 const quantityExpr = { $ifNull: ['$quantity', 0] };
@@ -38,7 +39,14 @@ const normalizedQuantityExpr = {
 
 const buildTimelinePayload = async (userId, days) => {
     const daysNum = Math.max(parseInt(days, 10) || 30, 1);
-    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    // Get user's current family - required for shared inventory
+    const user = await User.findById(userId).select('currentFamilyId');
+    const currentFamilyId = user?.currentFamilyId;
+
+    if (!currentFamilyId) {
+        throw new Error('User must be part of a family to access waste analytics');
+    }
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
@@ -48,7 +56,7 @@ const buildTimelinePayload = async (userId, days) => {
     const timelineData = await WasteLog.aggregate([
         {
             $match: {
-                userId: userObjectId,
+                familyId: new mongoose.Types.ObjectId(currentFamilyId),
                 loggedAt: { $gte: startDate },
             },
         },
@@ -68,7 +76,7 @@ const buildTimelinePayload = async (userId, days) => {
     const dailyTotals = await WasteLog.aggregate([
         {
             $match: {
-                userId: userObjectId,
+                familyId: new mongoose.Types.ObjectId(currentFamilyId),
                 loggedAt: { $gte: startDate },
             },
         },
@@ -85,7 +93,7 @@ const buildTimelinePayload = async (userId, days) => {
     const categoryTotals = await WasteLog.aggregate([
         {
             $match: {
-                userId: userObjectId,
+                familyId: new mongoose.Types.ObjectId(currentFamilyId),
                 loggedAt: { $gte: startDate },
             },
         },
@@ -235,9 +243,17 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 });
 
-// Get waste analytics for a user
+// Get waste analytics for a family
 router.get('/analytics', authMiddleware, async (req, res) => {
     try {
+        // Get user's current family - required for shared inventory
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
+        if (!currentFamilyId) {
+            return res.status(400).json({ message: 'User must be part of a family to access waste analytics' });
+        }
+
         const { days = 30 } = req.query;
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - parseInt(days));
@@ -245,7 +261,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
         const stats = await WasteLog.aggregate([
             {
                 $match: {
-                    userId: new mongoose.Types.ObjectId(req.userId),
+                    familyId: new mongoose.Types.ObjectId(currentFamilyId),
                     loggedAt: { $gte: startDate },
                 },
             },
@@ -262,7 +278,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
         const categoryBreakdown = await WasteLog.aggregate([
             {
                 $match: {
-                    userId: new mongoose.Types.ObjectId(req.userId),
+                    familyId: new mongoose.Types.ObjectId(currentFamilyId),
                     loggedAt: { $gte: startDate },
                 },
             },
