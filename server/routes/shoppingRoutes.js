@@ -5,24 +5,20 @@ const PantryItem = require('../models/PantryItem');
 const { User } = require('../models');
 const authMiddleware = require('../middleware/auth');
 
-// Get all shopping items for a user (filtered by family)
+// Get all shopping items for a family (shared inventory)
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        // Get user's current family
+        // Get user's current family - required for shared inventory
         const user = await User.findById(req.userId).select('currentFamilyId');
         const currentFamilyId = user?.currentFamilyId;
 
-        // Get shopping items for current family (or personal if no family)
-        let query;
-        if (currentFamilyId) {
-            // Show family shopping list items
-            query = { familyId: currentFamilyId };
-            console.log(`📋 Fetching family shopping items from family: ${currentFamilyId}`);
-        } else {
-            // Show personal shopping items only
-            query = { userId: req.userId, familyId: null };
-            console.log(`📋 Fetching personal shopping items for user: ${req.userId}`);
+        if (!currentFamilyId) {
+            return res.status(400).json({ message: 'User must be part of a family to access shopping list' });
         }
+
+        // Get shopping items for family only
+        const query = { familyId: currentFamilyId };
+        console.log(`📋 Fetching family shopping items from family: ${currentFamilyId}`);
 
         const items = await ShoppingItem.find(query).sort({ isPurchased: 1, createdAt: -1 });
         console.log(`✅ Found ${items.length} shopping items`);
@@ -37,15 +33,19 @@ router.get('/', authMiddleware, async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
     try {
         console.log('📝 Adding shopping item:', { name: req.body.name, userId: req.userId });
-        
+
         // Validate required fields
         if (!req.body.name || req.body.name.trim() === '') {
             return res.status(400).json({ message: 'Item name is required' });
         }
 
-        // Get user's current family
+        // Get user's current family - required for shared inventory
         const user = await User.findById(req.userId).select('currentFamilyId');
         const currentFamilyId = user?.currentFamilyId;
+
+        if (!currentFamilyId) {
+            return res.status(400).json({ message: 'User must be part of a family to add shopping items' });
+        }
 
         const item = new ShoppingItem({
             name: req.body.name.trim(),
@@ -53,10 +53,9 @@ router.post('/', authMiddleware, async (req, res) => {
             quantityUnit: req.body.quantityUnit || 'units',
             category: req.body.category || 'other',
             priority: req.body.priority || 'medium',
-            userId: req.userId,
-            familyId: currentFamilyId || null
+            familyId: currentFamilyId // Always assign to family for shared inventory
         });
-        
+
         const newItem = await item.save();
         console.log('✅ Shopping item created:', newItem._id);
         res.status(201).json(newItem);
@@ -70,19 +69,19 @@ router.post('/', authMiddleware, async (req, res) => {
 router.patch('/:id/purchase', authMiddleware, async (req, res) => {
     try {
         console.log(`🛍️  Marking item ${req.params.id} as purchased`);
-        
+
         const item = await ShoppingItem.findById(req.params.id);
         if (!item) return res.status(404).json({ message: 'Item not found' });
 
-        // Check authorization: user owns item OR is in same family
-        const isOwner = item.userId.toString() === req.userId.toString();
-        const isInSameFamily = item.familyId && (
-            await User.findById(req.userId)
-                .select('currentFamilyId')
-                .then(user => user?.currentFamilyId?.toString() === item.familyId.toString())
-        );
+        // Check authorization: all shopping items are family items now
+        if (!item.familyId) {
+            return res.status(400).json({ message: 'Shopping item must belong to a family' });
+        }
 
-        if (!isOwner && !isInSameFamily) {
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
+        if (!currentFamilyId || currentFamilyId.toString() !== item.familyId.toString()) {
             console.log(`❌ User ${req.userId} not authorized to modify item ${req.params.id}`);
             return res.status(403).json({ message: 'Not authorized to modify this item' });
         }
@@ -98,10 +97,13 @@ router.patch('/:id/purchase', authMiddleware, async (req, res) => {
             const user = await User.findById(req.userId).select('currentFamilyId');
             const currentFamilyId = user?.currentFamilyId;
 
+            if (!currentFamilyId) {
+                return res.status(400).json({ message: 'User must be part of a family to add items to pantry' });
+            }
+
             await PantryItem.create({
                 name: item.name,
-                userId: req.userId,
-                familyId: currentFamilyId || null,
+                familyId: currentFamilyId,
                 addedBy: req.userId,
                 category: item.category,
                 quantity: Number.isFinite(purchasedQty) && purchasedQty > 0 ? purchasedQty : 1,
@@ -122,19 +124,19 @@ router.patch('/:id/purchase', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
     try {
         console.log(`🗑️  Deleting shopping item: ${req.params.id}`);
-        
+
         const item = await ShoppingItem.findById(req.params.id);
         if (!item) return res.status(404).json({ message: 'Item not found' });
 
-        // Check authorization: user owns item OR is in same family
-        const isOwner = item.userId.toString() === req.userId.toString();
-        const isInSameFamily = item.familyId && (
-            await User.findById(req.userId)
-                .select('currentFamilyId')
-                .then(user => user?.currentFamilyId?.toString() === item.familyId.toString())
-        );
+        // Check authorization: all shopping items are family items now
+        if (!item.familyId) {
+            return res.status(400).json({ message: 'Shopping item must belong to a family' });
+        }
 
-        if (!isOwner && !isInSameFamily) {
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
+        if (!currentFamilyId || currentFamilyId.toString() !== item.familyId.toString()) {
             console.log(`❌ User ${req.userId} not authorized to delete item ${req.params.id}`);
             return res.status(403).json({ message: 'Not authorized to delete this item' });
         }

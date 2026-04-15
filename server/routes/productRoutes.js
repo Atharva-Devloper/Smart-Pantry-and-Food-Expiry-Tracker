@@ -47,19 +47,16 @@ router.get('/', authMiddleware, async (req, res) => {
     try {
         const { search, category, location, status, sort, view } = req.query;
 
-        // Get user's current family
+        // Get user's current family - required for shared inventory
         const user = await User.findById(req.userId).select('currentFamilyId');
         const currentFamilyId = user?.currentFamilyId;
 
-        // Build query - get personal items OR family shared items
-        let query = {
-            $or: [{ userId: req.userId }] // Personal items
-        };
-
-        // Include family items if user has a current family and not viewing personal only
-        if (currentFamilyId && view !== 'personal') {
-            query.$or.push({ familyId: currentFamilyId });
+        if (!currentFamilyId) {
+            return res.status(400).json({ message: 'User must be part of a family to access inventory' });
         }
+
+        // Build query - only family shared items
+        let query = { familyId: currentFamilyId };
 
         // Search by name
         if (search) {
@@ -86,7 +83,7 @@ router.get('/', authMiddleware, async (req, res) => {
         if (sort === 'quantity') sortQuery = { quantity: -1 };
         if (sort === 'newest') sortQuery = { createdAt: -1 };
 
-        console.log(`📋 Fetching products for user: ${req.userId}${currentFamilyId ? ' + family: ' + currentFamilyId : ''}`);
+        console.log(`📋 Fetching family products for family: ${currentFamilyId}`);
         const products = await PantryItem.find(query)
             .populate('addedBy', 'name')
             .populate('lastModifiedBy', 'name')
@@ -103,18 +100,16 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.get('/summary', authMiddleware, async (req, res) => {
     try {
-        // Get user's current family
+        // Get user's current family - required for shared inventory
         const user = await User.findById(req.userId).select('currentFamilyId');
         const currentFamilyId = user?.currentFamilyId;
 
-        // Build query - personal items + family items if applicable
-        let query = {
-            $or: [{ userId: req.userId }]
-        };
-
-        if (currentFamilyId) {
-            query.$or.push({ familyId: currentFamilyId });
+        if (!currentFamilyId) {
+            return res.status(400).json({ message: 'User must be part of a family to access inventory' });
         }
+
+        // Build query - only family items
+        let query = { familyId: currentFamilyId };
 
         const totalItems = await PantryItem.countDocuments(query);
         const expiredItems = await PantryItem.countDocuments({ ...query, status: 'expired' });
@@ -184,14 +179,17 @@ router.post('/', authMiddleware, async (req, res) => {
             };
         }
 
-        // Get user's current family to auto-share if applicable
+        // Get user's current family - required for shared inventory
         const user = await User.findById(req.userId).select('currentFamilyId');
-        const familyId = user?.currentFamilyId || null;
+        const familyId = user?.currentFamilyId;
+
+        if (!familyId) {
+            return res.status(400).json({ message: 'User must be part of a family to add items to inventory' });
+        }
 
         const product = await PantryItem.create({
             ...req.body,
-            userId: req.userId, // Use authenticated user's ID
-            familyId: req.body.shareWithFamily ? familyId : null,
+            familyId: familyId, // Always assign to family for shared inventory
             addedBy: req.userId,
             name: foodName,
             category: normalizeCategory(aiData.category),
@@ -209,7 +207,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // ---------- BATCH OPERATIONS ----------
 
-    router.delete('/batch', authMiddleware, async (req, res) => {
+router.delete('/batch', authMiddleware, async (req, res) => {
     try {
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0) {
@@ -219,7 +217,7 @@ router.post('/', authMiddleware, async (req, res) => {
         // Verify all items belong to user or their family before deletion
         const products = await PantryItem.find({ _id: { $in: ids } });
         const user = await User.findById(req.userId).select('currentFamilyId');
-        
+
         for (const product of products) {
             const canDelete = await checkDeletePermission(product, req.userId);
             if (!canDelete) {
@@ -244,7 +242,7 @@ router.put('/batch/status', authMiddleware, async (req, res) => {
         // Verify all items belong to user or their family before updating
         const products = await PantryItem.find({ _id: { $in: ids } });
         const user = await User.findById(req.userId).select('currentFamilyId');
-        
+
         for (const product of products) {
             const canEdit = await checkEditPermission(product, req.userId);
             if (!canEdit) {
@@ -286,7 +284,8 @@ router.delete('/:id', authMiddleware, async (req, res) => {
             quantity: deletedProduct.quantity || 1,
             quantityUnit: deletedProduct.quantityUnit || 'units',
             reason: deletedProduct.status === 'expired' ? 'expired' : 'other',
-            userId: deletedProduct.userId,
+            familyId: deletedProduct.familyId,
+            userId: req.userId, // Track who deleted it
             loggedAt: new Date(),
         });
 
@@ -301,26 +300,26 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// Helper function to check delete permissions
+// Helper function to check delete permissions for family items
 async function checkDeletePermission(product, userId) {
-    // User can always delete their own items
-    if (product.userId.toString() === userId.toString()) {
+    // All items are family items now
+    if (!product.familyId) {
+        return false;
+    }
+
+    const family = await Family.findById(product.familyId);
+    if (!family) {
+        return false;
+    }
+
+    // Owner and admins can always delete
+    if (family.isAdmin(userId)) {
         return true;
     }
 
-    // Check family permissions for shared items
-    if (product.familyId) {
-        const family = await Family.findById(product.familyId);
-        if (family) {
-            // Owner and admins can always delete
-            if (family.isAdmin(userId)) {
-                return true;
-            }
-            // Members can delete if settings allow
-            if (family.settings.allowMembersToDelete && family.isMember(userId)) {
-                return true;
-            }
-        }
+    // Members can delete if settings allow
+    if (family.settings.allowMembersToDelete && family.isMember(userId)) {
+        return true;
     }
 
     return false;
@@ -366,19 +365,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// Helper function to check edit permissions
+// Helper function to check edit permissions for family items
 async function checkEditPermission(product, userId) {
-    // User can always edit their own items
-    if (product.userId.toString() === userId.toString()) {
-        return true;
+    // All items are family items now
+    if (!product.familyId) {
+        return false;
     }
 
-    // Family members can edit shared items
-    if (product.familyId) {
-        const family = await Family.findById(product.familyId);
-        if (family && family.isMember(userId)) {
-            return true;
-        }
+    const family = await Family.findById(product.familyId);
+    if (family && family.isMember(userId)) {
+        return true; // All family members can edit shared items
     }
 
     return false;
