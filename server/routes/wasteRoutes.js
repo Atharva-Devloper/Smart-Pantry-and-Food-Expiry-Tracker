@@ -110,7 +110,7 @@ const buildTimelinePayload = async (userId, days) => {
     const familyTotals = await WasteLog.aggregate([
         {
             $match: {
-                userId: userObjectId,
+                familyId: new mongoose.Types.ObjectId(currentFamilyId),
                 loggedAt: { $gte: startDate },
             },
         },
@@ -132,7 +132,7 @@ const buildTimelinePayload = async (userId, days) => {
     const dailyFamilyRaw = await WasteLog.aggregate([
         {
             $match: {
-                userId: userObjectId,
+                familyId: new mongoose.Types.ObjectId(currentFamilyId),
                 loggedAt: { $gte: startDate },
             },
         },
@@ -157,7 +157,7 @@ const buildTimelinePayload = async (userId, days) => {
     const valueTotals = await WasteLog.aggregate([
         {
             $match: {
-                userId: userObjectId,
+                familyId: new mongoose.Types.ObjectId(currentFamilyId),
                 loggedAt: { $gte: startDate },
             },
         },
@@ -232,9 +232,18 @@ const buildTimelinePayload = async (userId, days) => {
 // Log a wasted item (usually called when deleting from pantry with a reason)
 router.post('/', authMiddleware, async (req, res) => {
     try {
+        // Get user's current family - required for shared inventory
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
+        if (!currentFamilyId) {
+            return res.status(400).json({ message: 'User must be part of a family to log waste' });
+        }
+
         const waste = new WasteLog({
             ...req.body,
-            userId: req.userId
+            userId: req.userId,
+            familyId: currentFamilyId
         });
         const newLog = await waste.save();
         res.status(201).json(newLog);
