@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { 
-  LayoutDashboard, Package, Users, AlertCircle, 
+import {
+  LayoutDashboard, Package, Users, AlertCircle,
   ShoppingCart, TrendingUp, Calendar, Clock, Plus
 } from 'lucide-react';
 import API_BASE_URL from '../config';

@@ -10,7 +10,6 @@ const ShoppingPage = () => {
         name: '',
         quantity: '1',
         quantityUnit: 'units',
-        category: 'other',
         priority: 'medium',
     });
     const [loading, setLoading] = useState(true);
@@ -72,7 +71,7 @@ const ShoppingPage = () => {
                 }),
             });
             if (response.ok) {
-                setNewItem({ name: '', quantity: '1', quantityUnit: 'units', category: 'other', priority: 'medium' });
+                setNewItem({ name: '', quantity: '1', quantityUnit: 'units', priority: 'medium' });
                 setSuccessMessage('✅ Item added to shopping list!');
                 setError('');
                 fetchItems();
@@ -168,29 +167,6 @@ const ShoppingPage = () => {
                                     }
                                     className="item-input"
                                 />
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="item-category">Category</label>
-                                <select
-                                    id="item-category"
-                                    value={newItem.category}
-                                    onChange={(e) =>
-                                        setNewItem({ ...newItem, category: e.target.value })
-                                    }
-                                    className="priority-select"
-                                >
-                                    <option value="fruits">Fruits</option>
-                                    <option value="vegetables">Vegetables</option>
-                                    <option value="dairy">Dairy</option>
-                                    <option value="meat">Meat</option>
-                                    <option value="grains">Grains</option>
-                                    <option value="snacks">Snacks</option>
-                                    <option value="beverages">Beverages</option>
-                                    <option value="condiments">Condiments</option>
-                                    <option value="frozen">Frozen</option>
-                                    <option value="other">Other</option>
-                                </select>
                             </div>
 
                             <div className="form-group">
