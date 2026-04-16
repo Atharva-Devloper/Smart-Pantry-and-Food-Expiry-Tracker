@@ -111,6 +111,60 @@ app.get('/api/test/users', async (req, res) => {
 const seedRoute = require('./routes/seedRoute');
 app.use('/api/seed', seedRoute);
 
+// Direct seed endpoint as fallback
+app.post('/api/seed', async (req, res) => {
+    try {
+        console.log('🌱 Starting seed data creation...');
+        const { User, PantryItem, ShoppingItem, WasteLog, Family, CalorieTracker } = require('./models');
+        const bcrypt = require('bcryptjs');
+
+        // Create or get demo user
+        let testUser = await User.findOne({ email: 'demo@smartpantry.com' });
+
+        if (!testUser) {
+            console.log('Creating demo user...');
+            const hashedPassword = await bcrypt.hash('demo123', 10);
+            testUser = await User.create({
+                name: 'Demo User',
+                email: 'demo@smartpantry.com',
+                password: hashedPassword,
+            });
+        }
+
+        // Create or get family
+        let family = await Family.findOne({ 'members.userId': testUser._id });
+
+        if (!family) {
+            family = await Family.create({
+                name: 'Demo Family',
+                joinCode: 'DEMO123',
+                members: [{
+                    userId: testUser._id,
+                    role: 'owner',
+                    joinedAt: new Date()
+                }]
+            });
+
+            testUser.currentFamilyId = family._id;
+            await testUser.save();
+        }
+
+        res.json({
+            success: true,
+            message: 'Demo user created successfully',
+            user: {
+                email: testUser.email,
+                password: 'demo123'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 // Debug route to test product endpoint
 app.get('/api/debug/products', async (req, res) => {
     try {
