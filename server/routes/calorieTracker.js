@@ -38,9 +38,19 @@ const applyMealConsumption = async ({ userId, date, mealType, items }) => {
     }
 
     const pantryIds = [...new Set(normalizedItems.map((item) => item.pantryItemId))];
+
+    // Get user's current family for pantry items
+    const User = require('../models/User');
+    const user = await User.findById(userId).select('currentFamilyId');
+    const currentFamilyId = user?.currentFamilyId;
+
+    if (!currentFamilyId) {
+        throw new Error('User must be part of a family to track calories');
+    }
+
     const pantryDocs = await PantryItem.find({
         _id: { $in: pantryIds },
-        userId,
+        familyId: currentFamilyId,
     });
 
     const pantryById = new Map(pantryDocs.map((item) => [String(item._id), item]));
@@ -184,13 +194,13 @@ const findOrCreateTrackerForDate = async (userId, dateValue) => {
     const { startOfDay, endOfDay } = getDayRange(dateValue);
 
     let tracker = await CalorieTracker.findOne({
-        userId,
+        userId: userId, // Reverted back to userId-based logic
         date: { $gte: startOfDay, $lte: endOfDay },
     }).populate('meals.items.pantryItemId');
 
     if (!tracker) {
         tracker = new CalorieTracker({
-            userId,
+            userId: userId, // Reverted back to userId-based logic
             date: startOfDay,
             meals: [],
         });
@@ -231,7 +241,7 @@ router.get('/history', auth, async (req, res) => {
         const end = new Date(endDate);
 
         const calorieHistory = await CalorieTracker.find({
-            userId: req.userId,
+            userId: req.userId, // Reverted back to userId-based logic
             date: {
                 $gte: start,
                 $lte: end
@@ -305,7 +315,7 @@ router.put('/water', auth, async (req, res) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         let calorieTracker = await CalorieTracker.findOne({
-            userId: req.userId,
+            userId: req.userId, // Reverted back to userId-based logic
             date: {
                 $gte: startOfDay,
                 $lte: endOfDay
@@ -314,7 +324,7 @@ router.put('/water', auth, async (req, res) => {
 
         if (!calorieTracker) {
             calorieTracker = new CalorieTracker({
-                userId: req.userId,
+                userId: req.userId, // Reverted back to userId-based logic
                 date: targetDate,
                 meals: [],
                 waterIntake: waterIntake,
@@ -344,7 +354,7 @@ router.put('/notes', auth, async (req, res) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         let calorieTracker = await CalorieTracker.findOne({
-            userId: req.userId,
+            userId: req.userId, // Reverted back to userId-based logic
             date: {
                 $gte: startOfDay,
                 $lte: endOfDay
@@ -353,7 +363,7 @@ router.put('/notes', auth, async (req, res) => {
 
         if (!calorieTracker) {
             calorieTracker = new CalorieTracker({
-                userId: req.userId,
+                userId: req.userId, // Reverted back to userId-based logic
                 date: targetDate,
                 meals: [],
                 notes: notes,
@@ -383,7 +393,7 @@ router.delete('/meal/:date/:mealType/:itemIndex', auth, async (req, res) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         const calorieTracker = await CalorieTracker.findOne({
-            userId: req.userId,
+            userId: req.userId, // Reverted back to userId-based logic
             date: {
                 $gte: startOfDay,
                 $lte: endOfDay
@@ -418,8 +428,13 @@ router.delete('/meal/:date/:mealType/:itemIndex', auth, async (req, res) => {
 // Get pantry items for meal creation
 router.get('/pantry-items', auth, async (req, res) => {
     try {
+        // Get user's current family for pantry items
+        const User = require('../models/User');
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
         const pantryItems = await PantryItem.find({
-            userId: req.userId,
+            familyId: currentFamilyId,
             status: { $in: ['fresh', 'expiring'] },
             quantity: { $gt: 0 },
         }).sort({ name: 1 });
@@ -455,7 +470,7 @@ router.get('/stats', auth, async (req, res) => {
         const stats = await CalorieTracker.aggregate([
             {
                 $match: {
-                    userId: req.userId,
+                    userId: req.userId, // Reverted back to userId-based logic
                     date: { $gte: startDate }
                 }
             },

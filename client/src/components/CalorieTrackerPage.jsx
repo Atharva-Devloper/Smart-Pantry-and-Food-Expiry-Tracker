@@ -57,6 +57,7 @@ const CalorieTrackerPage = () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/calories/date/${date}`, {
                 headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
             });
 
             if (response.ok) {
@@ -75,6 +76,7 @@ const CalorieTrackerPage = () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/calories/pantry-items`, {
                 headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
             });
 
             if (!response.ok) return;
@@ -99,6 +101,7 @@ const CalorieTrackerPage = () => {
                 `${API_BASE_URL}/api/calories/history?startDate=${start.toISOString()}&endDate=${end.toISOString()}`,
                 {
                     headers: { Authorization: `Bearer ${token}` },
+                    credentials: 'include',
                 }
             );
 
@@ -181,6 +184,7 @@ const CalorieTrackerPage = () => {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     date: selectedDate,
                     mealType: formData.mealType,
@@ -228,6 +232,7 @@ const CalorieTrackerPage = () => {
                 {
                     method: 'DELETE',
                     headers: { Authorization: `Bearer ${token}` },
+                    credentials: 'include',
                 }
             );
 
@@ -329,209 +334,209 @@ const CalorieTrackerPage = () => {
                                 value={formData.mealType}
                                 onChange={(e) =>
                                     setFormData((prev) => ({ ...prev, mealType: e.target.value }))
-                            }
+                                }
+                            >
+                                <option value="breakfast">Breakfast</option>
+                                <option value="lunch">Lunch</option>
+                                <option value="dinner">Dinner</option>
+                                <option value="snack">Snack</option>
+                            </select>
+
+                            <select
+                                className="food-unit-select"
+                                value={formData.pantryItemId}
+                                onChange={(e) =>
+                                    setFormData((prev) => ({ ...prev, pantryItemId: e.target.value }))
+                                }
+                            >
+                                {pantryItems.length === 0 && <option value="">No pantry items</option>}
+                                {pantryItems.map((item) => (
+                                    <option key={item._id} value={item._id}>
+                                        {item.name} ({item.quantity} {item.quantityUnit})
+                                    </option>
+                                ))}
+                            </select>
+
+                            <input
+                                type="number"
+                                className="food-quantity-input"
+                                placeholder={
+                                    selectedPantryItem
+                                        ? `Qty in ${selectedPantryItem.quantityUnit}`
+                                        : 'Consumed qty'
+                                }
+                                min="0.01"
+                                step="0.01"
+                                max={selectedPantryItem?.quantity || undefined}
+                                value={formData.consumedQuantity}
+                                onChange={(e) =>
+                                    setFormData((prev) => ({ ...prev, consumedQuantity: e.target.value }))
+                                }
+                            />
+
+                            <button
+                                type="button"
+                                className="save-btn"
+                                onClick={addIngredientToMealDraft}
+                                disabled={!selectedPantryItem}
+                            >
+                                Add Ingredient
+                            </button>
+                        </div>
+
+                        <div style={{ marginTop: '0.75rem' }}>
+                            {mealDraftItems.length === 0 ? (
+                                <p style={{ margin: 0, opacity: 0.75 }}>
+                                    Add one or more ingredients, then log them together for this meal.
+                                </p>
+                            ) : (
+                                <div className="meal-items" style={{ marginBottom: '0.8rem' }}>
+                                    {mealDraftItems.map((item, idx) => (
+                                        <div key={`${item.pantryItemId}-${idx}`} className="food-item">
+                                            <div className="food-main">
+                                                <span className="food-name">{item.name}</span>
+                                                <span className="food-quantity">
+                                                    {item.consumedQuantity} {item.unit}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeIngredientFromMealDraft(idx)}
+                                                className="delete-item-btn"
+                                                title="Remove ingredient"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                className="save-btn"
+                                disabled={mealDraftItems.length === 0}
+                            >
+                                Log Meal ({mealDraftItems.length} items)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div className="meals-section">
+                    <div className="meals-header">
+                        <h2>Meals Logged</h2>
+                    </div>
+
+                    {!trackerData?.meals || trackerData.meals?.length === 0 ? (
+                        <div className="no-meals">
+                            <div className="no-meals-icon">🍽</div>
+                            <h3>No consumption logged yet</h3>
+                            <p>Add ingredients above and log them as a meal.</p>
+                        </div>
+                    ) : (
+                        trackerData.meals.map((meal, index) => (
+                            <div key={index} className="meal-card">
+                                <div className="meal-header">
+                                    <h3 className="meal-type">
+                                        {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}
+                                    </h3>
+                                    <span className="meal-calories">
+                                        {Math.round(meal.totalCalories || 0)} calories
+                                    </span>
+                                </div>
+
+                                <div className="meal-items">
+                                    {meal.items.map((item, itemIndex) => (
+                                        <div key={itemIndex} className="food-item">
+                                            <div className="food-main">
+                                                <span className="food-name">{item.name}</span>
+                                                <span className="food-quantity">
+                                                    {item.quantity} {item.unit}
+                                                </span>
+                                                <span className="food-calories">
+                                                    {Math.round(item.calories || 0)} cal
+                                                </span>
+                                                <span className="food-quantity" style={{ opacity: 0.75 }}>
+                                                    Source: {item.estimateSource || 'fallback'}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => deleteMealItem(selectedDate, meal.type, itemIndex)}
+                                                className="delete-item-btn"
+                                                title="Delete this logged entry"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="meals-section" style={{ marginTop: '1.5rem' }}>
+                    <div className="meals-header">
+                        <h2>History and Cumulative Calories</h2>
+                    </div>
+
+                    <div
+                        className="food-item-input"
+                        style={{ gridTemplateColumns: '1fr 1fr 1fr', marginBottom: '1rem' }}
+                    >
+                        <select
+                            className="food-unit-select"
+                            value={historyViewMode}
+                            onChange={(e) => setHistoryViewMode(e.target.value)}
                         >
-                            <option value="breakfast">Breakfast</option>
-                            <option value="lunch">Lunch</option>
-                            <option value="dinner">Dinner</option>
-                            <option value="snack">Snack</option>
+                            <option value="daily">Daily View</option>
+                            <option value="weekly">Weekly Condensed View</option>
                         </select>
 
                         <select
                             className="food-unit-select"
-                            value={formData.pantryItemId}
-                            onChange={(e) =>
-                                setFormData((prev) => ({ ...prev, pantryItemId: e.target.value }))
-                            }
+                            value={historyDays}
+                            onChange={(e) => setHistoryDays(Number(e.target.value))}
                         >
-                            {pantryItems.length === 0 && <option value="">No pantry items</option>}
-                            {pantryItems.map((item) => (
-                                <option key={item._id} value={item._id}>
-                                    {item.name} ({item.quantity} {item.quantityUnit})
-                                </option>
-                            ))}
+                            <option value={7}>Last 7 Days</option>
+                            <option value={14}>Last 14 Days</option>
+                            <option value={30}>Last 30 Days</option>
+                            <option value={60}>Last 60 Days</option>
                         </select>
 
-                        <input
-                            type="number"
-                            className="food-quantity-input"
-                            placeholder={
-                                selectedPantryItem
-                                    ? `Qty in ${selectedPantryItem.quantityUnit}`
-                                    : 'Consumed qty'
-                            }
-                            min="0.01"
-                            step="0.01"
-                            max={selectedPantryItem?.quantity || undefined}
-                            value={formData.consumedQuantity}
-                            onChange={(e) =>
-                                setFormData((prev) => ({ ...prev, consumedQuantity: e.target.value }))
-                            }
-                        />
-
-                        <button
-                            type="button"
-                            className="save-btn"
-                            onClick={addIngredientToMealDraft}
-                            disabled={!selectedPantryItem}
-                        >
-                            Add Ingredient
-                        </button>
-                    </div>
-
-                    <div style={{ marginTop: '0.75rem' }}>
-                        {mealDraftItems.length === 0 ? (
-                            <p style={{ margin: 0, opacity: 0.75 }}>
-                                Add one or more ingredients, then log them together for this meal.
-                            </p>
-                        ) : (
-                            <div className="meal-items" style={{ marginBottom: '0.8rem' }}>
-                                {mealDraftItems.map((item, idx) => (
-                                    <div key={`${item.pantryItemId}-${idx}`} className="food-item">
-                                        <div className="food-main">
-                                            <span className="food-name">{item.name}</span>
-                                            <span className="food-quantity">
-                                                {item.consumedQuantity} {item.unit}
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeIngredientFromMealDraft(idx)}
-                                            className="delete-item-btn"
-                                            title="Remove ingredient"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            className="save-btn"
-                            disabled={mealDraftItems.length === 0}
-                        >
-                            Log Meal ({mealDraftItems.length} items)
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <div className="meals-section">
-                <div className="meals-header">
-                    <h2>Meals Logged</h2>
-                </div>
-
-                {!trackerData?.meals || trackerData.meals.length === 0 ? (
-                    <div className="no-meals">
-                        <div className="no-meals-icon">🍽</div>
-                        <h3>No consumption logged yet</h3>
-                        <p>Add ingredients above and log them as a meal.</p>
-                    </div>
-                ) : (
-                    trackerData.meals.map((meal, index) => (
-                        <div key={index} className="meal-card">
-                            <div className="meal-header">
-                                <h3 className="meal-type">
-                                    {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}
-                                </h3>
-                                <span className="meal-calories">
-                                    {Math.round(meal.totalCalories || 0)} calories
-                                </span>
-                            </div>
-
-                            <div className="meal-items">
-                                {meal.items.map((item, itemIndex) => (
-                                    <div key={itemIndex} className="food-item">
-                                        <div className="food-main">
-                                            <span className="food-name">{item.name}</span>
-                                            <span className="food-quantity">
-                                                {item.quantity} {item.unit}
-                                            </span>
-                                            <span className="food-calories">
-                                                {Math.round(item.calories || 0)} cal
-                                            </span>
-                                            <span className="food-quantity" style={{ opacity: 0.75 }}>
-                                                Source: {item.estimateSource || 'fallback'}
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={() => deleteMealItem(selectedDate, meal.type, itemIndex)}
-                                            className="delete-item-btn"
-                                            title="Delete this logged entry"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="food-quantity-input" style={{ display: 'flex', alignItems: 'center' }}>
+                            Window Total: {totalWindowCalories} kcal
                         </div>
-                    ))
-                )}
-            </div>
-
-            <div className="meals-section" style={{ marginTop: '1.5rem' }}>
-                <div className="meals-header">
-                    <h2>History and Cumulative Calories</h2>
-                </div>
-
-                <div
-                    className="food-item-input"
-                    style={{ gridTemplateColumns: '1fr 1fr 1fr', marginBottom: '1rem' }}
-                >
-                    <select
-                        className="food-unit-select"
-                        value={historyViewMode}
-                        onChange={(e) => setHistoryViewMode(e.target.value)}
-                    >
-                        <option value="daily">Daily View</option>
-                        <option value="weekly">Weekly Condensed View</option>
-                    </select>
-
-                    <select
-                        className="food-unit-select"
-                        value={historyDays}
-                        onChange={(e) => setHistoryDays(Number(e.target.value))}
-                    >
-                        <option value={7}>Last 7 Days</option>
-                        <option value={14}>Last 14 Days</option>
-                        <option value={30}>Last 30 Days</option>
-                        <option value={60}>Last 60 Days</option>
-                    </select>
-
-                    <div className="food-quantity-input" style={{ display: 'flex', alignItems: 'center' }}>
-                        Window Total: {totalWindowCalories} kcal
                     </div>
-                </div>
 
-                {cumulativeHistory.length === 0 ? (
-                    <p style={{ margin: 0, opacity: 0.75 }}>No history available in selected range.</p>
-                ) : (
-                    <div className="meal-items">
-                        {cumulativeHistory.map((entry) => (
-                            <div
-                                key={entry.weekStart || entry.date}
-                                className="food-item"
-                                style={{ justifyContent: 'space-between' }}
-                            >
-                                <div className="food-main">
-                                    <span className="food-name">
-                                        {historyViewMode === 'weekly'
-                                            ? `Week of ${entry.weekStart}`
-                                            : entry.date}
+                    {cumulativeHistory.length === 0 ? (
+                        <p style={{ margin: 0, opacity: 0.75 }}>No history available in selected range.</p>
+                    ) : (
+                        <div className="meal-items">
+                            {cumulativeHistory.map((entry) => (
+                                <div
+                                    key={entry.weekStart || entry.date}
+                                    className="food-item"
+                                    style={{ justifyContent: 'space-between' }}
+                                >
+                                    <div className="food-main">
+                                        <span className="food-name">
+                                            {historyViewMode === 'weekly'
+                                                ? `Week of ${entry.weekStart}`
+                                                : entry.date}
+                                        </span>
+                                        <span className="food-calories">{entry.calories} kcal</span>
+                                    </div>
+                                    <span className="food-quantity" style={{ fontWeight: 700 }}>
+                                        Cumulative: {entry.cumulativeCalories} kcal
                                     </span>
-                                    <span className="food-calories">{entry.calories} kcal</span>
                                 </div>
-                                <span className="food-quantity" style={{ fontWeight: 700 }}>
-                                    Cumulative: {entry.cumulativeCalories} kcal
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
         </div>
     );
 };

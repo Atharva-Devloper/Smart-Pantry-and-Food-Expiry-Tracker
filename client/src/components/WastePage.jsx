@@ -83,6 +83,7 @@ const WastePage = () => {
                         headers: {
                             Authorization: `Bearer ${token}`,
                         },
+                        credentials: 'include',
                     }
                 );
 
@@ -201,186 +202,186 @@ const WastePage = () => {
                         {/* Daily Waste Trend */}
                         <div className="chart-section">
                             <h2>📈 Daily Waste Trend</h2>
-                        <div className="chart-container">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={trendChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fontSize: 12 }}
-                                        interval={Math.floor(trendChartData.length / 7) || 0}
-                                    />
-                                    <YAxis
-                                        label={{
-                                            value: 'Items Wasted',
-                                            angle: -90,
-                                            position: 'insideLeft',
-                                        }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: '#f9f9f9',
-                                            border: '1px solid #ccc',
-                                            borderRadius: '4px',
-                                        }}
-                                        formatter={(value) => [value, 'Items']}
-                                    />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="totalCount"
-                                        stroke="#FF6B6B"
-                                        dot={{ r: 4 }}
-                                        activeDot={{ r: 6 }}
-                                        name="Items Wasted"
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="cumulativeCount"
-                                        stroke="#2E86DE"
-                                        dot={false}
-                                        strokeWidth={2}
-                                        name="Cumulative Items"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    <div className="chart-section">
-                        <h2>⚖️ Quantity by Unit Family</h2>
-                        <div className="stats-cards">
-                            <div className="stat-card">
-                                <h3>Mass Wasted</h3>
-                                <p className="stat-value">{getFamilyQuantity('mass').toFixed(1)}</p>
-                                <span className="stat-period">grams (g)</span>
-                            </div>
-                            <div className="stat-card">
-                                <h3>Volume Wasted</h3>
-                                <p className="stat-value">{getFamilyQuantity('volume').toFixed(1)}</p>
-                                <span className="stat-period">milliliters (ml)</span>
-                            </div>
-                            <div className="stat-card">
-                                <h3>Discrete Wasted</h3>
-                                <p className="stat-value">{getFamilyQuantity('discrete').toFixed(1)}</p>
-                                <span className="stat-period">item units</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Category Breakdown - Stacked Bar Chart */}
-                    <div className="chart-section">
-                        <h2>🍎 Waste by Food Category</h2>
-                        <div className="chart-container">
-                            <ResponsiveContainer width="100%" height={400}>
-                                <BarChart data={timelineData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fontSize: 12 }}
-                                        interval={Math.floor(timelineData.length / 7) || 0}
-                                    />
-                                    <YAxis
-                                        label={{
-                                            value: 'Items',
-                                            angle: -90,
-                                            position: 'insideLeft',
-                                        }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: '#f9f9f9',
-                                            border: '1px solid #ccc',
-                                            borderRadius: '4px',
-                                        }}
-                                        formatter={(value) => [value, 'Items']}
-                                    />
-                                    <Legend />
-                                    {categoryTotals.map((cat, idx) => (
-                                        <Bar
-                                            key={cat._id}
-                                            dataKey={cat._id}
-                                            stackId="categories"
-                                            fill={COLORS[idx % COLORS.length]}
-                                            name={`${categoryEmojis[cat._id] || '📦'} ${cat._id}`}
+                            <div className="chart-container">
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <LineChart data={trendChartData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis
+                                            dataKey="date"
+                                            tick={{ fontSize: 12 }}
+                                            interval={Math.floor(trendChartData.length / 7) || 0}
                                         />
-                                    ))}
-                                </BarChart>
-                            </ResponsiveContainer>
+                                        <YAxis
+                                            label={{
+                                                value: 'Items Wasted',
+                                                angle: -90,
+                                                position: 'insideLeft',
+                                            }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#f9f9f9',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '4px',
+                                            }}
+                                            formatter={(value) => [value, 'Items']}
+                                        />
+                                        <Legend />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="totalCount"
+                                            stroke="#FF6B6B"
+                                            dot={{ r: 4 }}
+                                            activeDot={{ r: 6 }}
+                                            name="Items Wasted"
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="cumulativeCount"
+                                            stroke="#2E86DE"
+                                            dot={false}
+                                            strokeWidth={2}
+                                            name="Cumulative Items"
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Category Pie Chart */}
-                    <div className="chart-section">
-                        <h2>🥧 Total Waste Distribution</h2>
-                        <div className="chart-container pie-container">
-                            <ResponsiveContainer width="100%" height={350}>
-                                <PieChart>
-                                    <Pie
-                                        data={categoryTotals}
-                                        dataKey="totalCount"
-                                        nameKey="_id"
-                                        cx="50%"
-                                        cy="50%"
-                                        outerRadius={120}
-                                        label={({ _id, totalCount }) =>
-                                            `${categoryEmojis[_id] || '📦'} ${_id}: ${totalCount}`
-                                        }
-                                    >
-                                        {categoryTotals.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                fill={COLORS[index % COLORS.length]}
+                        <div className="chart-section">
+                            <h2>⚖️ Quantity by Unit Family</h2>
+                            <div className="stats-cards">
+                                <div className="stat-card">
+                                    <h3>Mass Wasted</h3>
+                                    <p className="stat-value">{getFamilyQuantity('mass').toFixed(1)}</p>
+                                    <span className="stat-period">grams (g)</span>
+                                </div>
+                                <div className="stat-card">
+                                    <h3>Volume Wasted</h3>
+                                    <p className="stat-value">{getFamilyQuantity('volume').toFixed(1)}</p>
+                                    <span className="stat-period">milliliters (ml)</span>
+                                </div>
+                                <div className="stat-card">
+                                    <h3>Discrete Wasted</h3>
+                                    <p className="stat-value">{getFamilyQuantity('discrete').toFixed(1)}</p>
+                                    <span className="stat-period">item units</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Category Breakdown - Stacked Bar Chart */}
+                        <div className="chart-section">
+                            <h2>🍎 Waste by Food Category</h2>
+                            <div className="chart-container">
+                                <ResponsiveContainer width="100%" height={400}>
+                                    <BarChart data={timelineData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis
+                                            dataKey="date"
+                                            tick={{ fontSize: 12 }}
+                                            interval={Math.floor(timelineData.length / 7) || 0}
+                                        />
+                                        <YAxis
+                                            label={{
+                                                value: 'Items',
+                                                angle: -90,
+                                                position: 'insideLeft',
+                                            }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#f9f9f9',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '4px',
+                                            }}
+                                            formatter={(value) => [value, 'Items']}
+                                        />
+                                        <Legend />
+                                        {categoryTotals.map((cat, idx) => (
+                                            <Bar
+                                                key={cat._id}
+                                                dataKey={cat._id}
+                                                stackId="categories"
+                                                fill={COLORS[idx % COLORS.length]}
+                                                name={`${categoryEmojis[cat._id] || '📦'} ${cat._id}`}
                                             />
                                         ))}
-                                    </Pie>
-                                    <Tooltip
-                                        formatter={(value) => [value, 'Items']}
-                                        contentStyle={{
-                                            backgroundColor: '#f9f9f9',
-                                            border: '1px solid #ccc',
-                                            borderRadius: '4px',
-                                        }}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Category Details Table */}
-                    <div className="chart-section">
-                        <h2>📋 Category Details</h2>
-                        <div className="category-table">
-                            <div className="table-header">
-                                <div className="table-col">Food Type</div>
-                                <div className="table-col">Items Wasted</div>
-                                <div className="table-col">Share</div>
-                            </div>
-                            <div className="table-body">
-                                {categoryTotals.length === 0 ? (
-                                    <div className="table-row empty">
-                                        <p>No waste data for this period. Great job!</p>
-                                    </div>
-                                ) : (
-                                    categoryTotals.map((cat) => (
-                                        <div key={cat._id} className="table-row">
-                                            <div className="table-col">
-                                                {categoryEmojis[cat._id] || '📦'} {cat._id}
-                                            </div>
-                                            <div className="table-col">{cat.totalCount}</div>
-                                            <div className="table-col">
-                                                {getTotalWastedCount() > 0
-                                                    ? `${((cat.totalCount / getTotalWastedCount()) * 100).toFixed(1)}%`
-                                                    : '0%'}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
+                        {/* Category Pie Chart */}
+                        <div className="chart-section">
+                            <h2>🥧 Total Waste Distribution</h2>
+                            <div className="chart-container pie-container">
+                                <ResponsiveContainer width="100%" height={350}>
+                                    <PieChart>
+                                        <Pie
+                                            data={categoryTotals}
+                                            dataKey="totalCount"
+                                            nameKey="_id"
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={120}
+                                            label={({ _id, totalCount }) =>
+                                                `${categoryEmojis[_id] || '📦'} ${_id}: ${totalCount}`
+                                            }
+                                        >
+                                            {categoryTotals.map((entry, index) => (
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={COLORS[index % COLORS.length]}
+                                                />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            formatter={(value) => [value, 'Items']}
+                                            contentStyle={{
+                                                backgroundColor: '#f9f9f9',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '4px',
+                                            }}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
-                    </div>
-                </>
-            )}
+
+                        {/* Category Details Table */}
+                        <div className="chart-section">
+                            <h2>📋 Category Details</h2>
+                            <div className="category-table">
+                                <div className="table-header">
+                                    <div className="table-col">Food Type</div>
+                                    <div className="table-col">Items Wasted</div>
+                                    <div className="table-col">Share</div>
+                                </div>
+                                <div className="table-body">
+                                    {categoryTotals.length === 0 ? (
+                                        <div className="table-row empty">
+                                            <p>No waste data for this period. Great job!</p>
+                                        </div>
+                                    ) : (
+                                        categoryTotals.map((cat) => (
+                                            <div key={cat._id} className="table-row">
+                                                <div className="table-col">
+                                                    {categoryEmojis[cat._id] || '📦'} {cat._id}
+                                                </div>
+                                                <div className="table-col">{cat.totalCount}</div>
+                                                <div className="table-col">
+                                                    {getTotalWastedCount() > 0
+                                                        ? `${((cat.totalCount / getTotalWastedCount()) * 100).toFixed(1)}%`
+                                                        : '0%'}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

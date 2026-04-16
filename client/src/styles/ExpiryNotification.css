@@ -1,0 +1,345 @@
+.expiry-notification-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.expiry-notification-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.expiry-notification-popup {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    transform: scale(0.8) translateY(20px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.expiry-notification-popup.show {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.notification-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+}
+
+.icon-emoji {
+    font-size: 24px;
+}
+
+.notification-title {
+    flex: 1;
+}
+
+.notification-title h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.notification-title p {
+    margin: 4px 0 0 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.close-button {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: background 0.2s ease;
+}
+
+.close-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.notification-content {
+    padding: 24px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.notification-section {
+    margin-bottom: 24px;
+}
+
+.notification-section:last-child {
+    margin-bottom: 0;
+}
+
+.notification-section h4 {
+    display: flex;
+    align-items: center;
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.section-icon {
+    margin-right: 8px;
+    font-size: 18px;
+}
+
+.notification-section.expired h4 {
+    color: #e74c3c;
+}
+
+.notification-section.expiring h4 {
+    color: #f39c12;
+}
+
+.items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border-left: 4px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.notification-item:hover {
+    background: #e9ecef;
+}
+
+.expired-item {
+    border-left-color: #e74c3c;
+    background: #fdf2f2;
+}
+
+.expired-item:hover {
+    background: #fde8e8;
+}
+
+.expiring-item {
+    border-left-color: #f39c12;
+    background: #fef9e7;
+}
+
+.expiring-item:hover {
+    background: #fef5d3;
+}
+
+.item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.item-name {
+    font-weight: 500;
+    color: #333;
+    font-size: 14px;
+}
+
+.item-quantity {
+    font-size: 12px;
+    color: #666;
+}
+
+.item-expiry {
+    text-align: right;
+}
+
+.expiry-status {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.expiry-status.expired {
+    background: #e74c3c;
+    color: white;
+}
+
+.expiry-status.today {
+    background: #e67e22;
+    color: white;
+}
+
+.expiry-status.expiring-soon {
+    background: #f39c12;
+    color: white;
+}
+
+.expiry-status.expiring {
+    background: #f1c40f;
+    color: #333;
+}
+
+.no-items {
+    text-align: center;
+    padding: 40px 20px;
+    color: #27ae60;
+}
+
+.no-items-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 16px;
+}
+
+.no-items p {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 12px;
+    padding: 24px;
+    border-top: 1px solid #f0f0f0;
+    background: #f8f9fa;
+}
+
+.action-button {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-button.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.action-button.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.action-button.secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.action-button.secondary:hover {
+    background: #667eea;
+    color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .expiry-notification-popup {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .notification-header {
+        padding: 20px;
+    }
+    
+    .notification-content {
+        padding: 20px;
+    }
+    
+    .notification-actions {
+        padding: 20px;
+        flex-direction: column;
+    }
+    
+    .action-button {
+        width: 100%;
+    }
+}
+
+/* Animation for items appearing */
+.notification-item {
+    animation: slideInUp 0.3s ease forwards;
+}
+
+.notification-item:nth-child(1) { animation-delay: 0.1s; }
+.notification-item:nth-child(2) { animation-delay: 0.15s; }
+.notification-item:nth-child(3) { animation-delay: 0.2s; }
+.notification-item:nth-child(4) { animation-delay: 0.25s; }
+.notification-item:nth-child(5) { animation-delay: 0.3s; }
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Scrollbar styling */
+.notification-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.notification-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.notification-content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.notification-content::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
