@@ -147,7 +147,7 @@ const startServer = (port) => {
     }
 
     const server = app
-        .listen(numericPort, () => {
+        .listen(numericPort, '0.0.0.0', () => {
             console.log(`✓ Server is running on port ${numericPort}`);
             console.log(`  Health check: http://localhost:${numericPort}/api/health`);
         })
