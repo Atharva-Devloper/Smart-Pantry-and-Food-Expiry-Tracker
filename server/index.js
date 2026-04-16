@@ -107,6 +107,10 @@ app.get('/api/test/users', async (req, res) => {
     }
 });
 
+// Seed route for demo data
+const seedRoute = require('./routes/seedRoute');
+app.use('/api/seed', seedRoute);
+
 // Debug route to test product endpoint
 app.get('/api/debug/products', async (req, res) => {
     try {
