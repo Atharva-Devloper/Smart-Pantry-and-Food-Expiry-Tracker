@@ -36,7 +36,8 @@ function AppContent() {
             <Navbar />
             <div className="main-content">
                 <Routes>
-                    <Route path="/" element={
+                    <Route path="/" element={user ? <Navigate to="/dashboard" /> : <HomePage />} />
+                    <Route path="/dashboard" element={
                         <ProtectedRoute>
                             <Dashboard />
                         </ProtectedRoute>
