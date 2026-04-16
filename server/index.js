@@ -37,6 +37,11 @@ app.use(
                 return callback(null, true);
             }
 
+            // Allow Vercel frontend
+            if (origin.includes('vercel.app')) {
+                return callback(null, true);
+            }
+
             // Allow from environment variable
             if (origin === process.env.CLIENT_URL) {
                 return callback(null, true);
