@@ -16,7 +16,7 @@ const getRequiredEnv = (name) => {
 };
 
 const app = express();
-const PORT = getRequiredEnv('PORT');
+const PORT = process.env.PORT || 8080;
 const MONGODB_URI =
     process.env.MONGO_URI || getRequiredEnv('MONGODB_URI');
 
