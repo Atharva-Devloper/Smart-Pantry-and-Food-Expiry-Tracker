@@ -13,7 +13,9 @@ import AcceptInvitation from './components/AcceptInvitation';
 import Navbar from './components/Navbar';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
+import ExpiryNotification from './components/ExpiryNotification';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useState } from 'react';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -25,7 +27,10 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function AppContent() {
+    const { user } = useAuth();
+
     console.log('App component rendered');
+
     return (
         <div className="App">
             <Navbar />
@@ -82,6 +87,9 @@ function AppContent() {
                     } />
                 </Routes>
             </div>
+
+            {/* Show expiry notification for authenticated users */}
+            {user && <ExpiryNotification user={user} />}
         </div>
     );
 }

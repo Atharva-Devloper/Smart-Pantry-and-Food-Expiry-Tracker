@@ -365,6 +365,50 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// GET EXPIRING PRODUCTS FOR NOTIFICATIONS
+router.get('/expiring', authMiddleware, async (req, res) => {
+    try {
+        // Get user's current family
+        const user = await User.findById(req.userId).select('currentFamilyId');
+        const currentFamilyId = user?.currentFamilyId;
+
+        if (!currentFamilyId) {
+            return res.json({ expiring: [], expired: [] });
+        }
+
+        const today = new Date();
+        const threeDaysFromNow = new Date(today);
+        threeDaysFromNow.setDate(today.getDate() + 3);
+
+        // Find items expiring in the next 3 days
+        const expiringSoon = await PantryItem.find({
+            familyId: currentFamilyId,
+            expiryDate: {
+                $gte: today,
+                $lte: threeDaysFromNow
+            },
+            status: { $in: ['fresh', 'expiring'] },
+            quantity: { $gt: 0 }
+        }).sort({ expiryDate: 1 }).limit(10);
+
+        // Find items already expired
+        const alreadyExpired = await PantryItem.find({
+            familyId: currentFamilyId,
+            expiryDate: { $lt: today },
+            status: { $in: ['fresh', 'expiring'] },
+            quantity: { $gt: 0 }
+        }).sort({ expiryDate: 1 }).limit(10);
+
+        res.json({
+            expiring: expiringSoon,
+            expired: alreadyExpired
+        });
+    } catch (err) {
+        console.error('Error fetching expiring products:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Helper function to check edit permissions for family items
 async function checkEditPermission(product, userId) {
     // All items are family items now
